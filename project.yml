@@ -1,0 +1,53 @@
+name: Signal Processing Primer
+options:
+  bundleIdPrefix: com.amalmehta
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.10"
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  Signal Processing Primer:
+    type: application
+    platform: macOS
+    sources:
+      - path: "Signal Processing Primer"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.amalmehta.SignalProcessingPrimer
+        PRODUCT_NAME: Signal Processing Primer
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Signal Processing Primer
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.education
+        INFOPLIST_KEY_NSHumanReadableCopyright: ""
+        ENABLE_HARDENED_RUNTIME: NO
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+  Signal Processing Primer Tests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests
+    dependencies:
+      - target: Signal Processing Primer
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.amalmehta.SignalProcessingPrimerTests
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Signal Processing Primer.app/Contents/MacOS/Signal Processing Primer"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+schemes:
+  Signal Processing Primer:
+    build:
+      targets:
+        Signal Processing Primer: all
+        Signal Processing Primer Tests: [test]
+    test:
+      targets:
+        - Signal Processing Primer Tests
