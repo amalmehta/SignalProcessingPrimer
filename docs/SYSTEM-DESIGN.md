@@ -75,6 +75,7 @@ flowchart TB
 | `DSP` | Pure 1-D maths on `[Float]`: tone and chirp generation, aliasing, quantisation and dither, SNR, windows, an FFT magnitude spectrum (Accelerate `vDSP.DiscreteFourierTransform`), STFT, dense and sparse convolution, RBJ biquads with frequency response, and a feed-forward compressor. |
 | `ColourDSP` / `RGBImage` | Lesson 13's maths: four transfer functions (linear, sRGB, power 2.2, BT.1886 2.4), quantizing a linear-light ramp through each, counting codes in the shadows, BT.601 Y′CbCr conversion, 4:4:4/4:2:2/4:2:0 subsampling (block-average chroma, then replicate), channel views and RGB PSNR. Also draws a colour test card with bars, a hue sweep, red text on blue, 1-px red/green stripes and a skin-tone patch. |
 | `WhiteBalance` | The light's colour at a temperature and tint: the Planckian locus (Kim et al. cubic fit), offset along its normal in CIE 1960 uv by the tint (±100 = Duv ∓0.02, negative = green as in Lightroom), → XYZ → linear sRGB, normalised so 6,500 K / tint 0 is neutral. Capture multiplies linear reflectance by the light, with exposure set so no channel clips. Camera correction applies per-channel gains relative to green. Also gray-world and eyedropper estimates, temperature-and-tint fitting (a coarse grid, then refined), and a 6×4 colour-checker chart with a neutral bottom row. |
+| `Gamut` | The CIE 1931 2° spectral locus, from the CIE table at 5 nm steps with linear interpolation; the Rec.709/sRGB, DCI-P3 and Rec.2020 primaries; and the D65 white. Inside tests (ray casting, with points on an edge counted as inside), and the horseshoe's fill colours: XYZ → linear sRGB, negatives clipped, scaled to peak 1. |
 | `ImageDSP` / `GrayImage` | Pure 2-D maths: a procedural test card, 2-D convolution kernels (blur, sharpen, Sobel, emboss), an orthonormal 8×8 DCT/IDCT, JPEG quantisation tables scaled like libjpeg, a JPEG round trip with zero-coefficient share and PSNR, and CGImage conversion. |
 | `TonePlayer` | One shared `AVAudioEngine` and player node. It plays a mono buffer at 44.1 kHz with 10 ms fades and stops the previous sound first. |
 | `ProgressStore` | Completed lessons, best quiz scores and the last-visited lesson, saved as JSON in `UserDefaults`. |
@@ -108,6 +109,7 @@ Nothing leaves the Mac unless you click **Open as GitHub Issue** and submit the 
 - **Pure engine functions.** All maths is in stateless functions on plain arrays. That makes it easy to unit-test and to reuse in a future website port, at the cost of recomputing on every redraw. This is fine at these sizes: FFTs of 4,096 points or fewer, about 2 s of audio, images of 360 px or less.
 - **Compute in the view body for audio demos.** It keeps the code simple, and the results come back in well under a frame on modern Macs. Image filtering and JPEG are slower (up to about 0.3 s in Debug builds), so they run in a detached task.
 - **Generated test material.** Tones, drum loops, chirps and the test card are all synthesised, so there are no licensing questions and the repo stays small. Users can still load their own photo.
+- **Spectral locus from the CIE table, not a formula.** An analytic fit of the colour-matching functions (Wyman et al. 2013) was tried first. It was too far off in the red tail: x = 0.57 instead of 0.735 at 700 nm. The 65-point CIE table is exact and small.
 - **Quiz pass mark is relative.** "All but one correct" (default) or "All correct" works for any quiz length; Lesson 13 has 4 questions. The stored values (2 and 3) are unchanged from v1, so existing settings carry over.
 - **Grayscale images for Lessons 10–11, colour for Lesson 13.** Filtering and JPEG work on luminance only, so those lessons stay about spatial frequency. Lesson 13 handles colour separately: gamma is shown as stored ramps, not on a photo, so the banding is unambiguous. Chroma subsampling uses a test card built to expose it, or your own photo in colour.
 - **Echoes by sparse convolution.** A 400 ms echo would be a 17,640-tap kernel. `sparseConvolve` applies only the non-zero taps, and a test checks it matches dense convolution exactly.
@@ -117,6 +119,7 @@ Nothing leaves the Mac unless you click **Open as GitHub Issue** and submit the 
 
 ## How it's tested
 
+- `GamutTests` (2) check the locus against tabulated CIE values (520 and 700 nm). They also check that Rec.2020's primaries fall on the 630/532/467 nm lines, that the gamuts nest (sRGB ⊂ P3 ⊂ Rec.2020 for the test colours), that D65 is inside every gamut, and that each primary is inside its own gamut.
 - `TintTests` (2) check that tint moves the light towards green or magenta, and that the matching camera tint neutralises it while the eyedropper recovers both temperature and tint.
 - `WhiteBalanceTests` (4) check that the light is neutral at 6,500 K, warm below and cool above; that the matching camera preset and the eyedropper make the gray patch neutral; that the eyedropper's estimate recovers the true light within 100 K; and that gray world is exact on a colourless scene.
 - `ColourTests` (4) check that every transfer function inverts exactly, that the lesson's numbers hold (26 vs 90 codes for the darkest 10% at 8 bits), Y′CbCr round trips, and that 4:2:0 keeps luma exactly while losing chroma detail.
@@ -135,7 +138,7 @@ Nothing leaves the Mac unless you click **Open as GitHub Issue** and submit the 
   - a spectrogram of a chirp rises over time
 - `CourseTests` (6) check the course shape (4 modules, 13 lessons), every lesson's integrity, unique ids with every demo used exactly once, the navigation helpers, `ProgressStore` persistence and pass mark (using an isolated `UserDefaults` suite), and the feedback file and issue URL.
 - **Visual check:** `scripts/screenshots.sh` opens each lesson at its demo and captures it. All 13 demos, Settings and the Feedback sheet were reviewed this way.
-- **Website:** `web/tests/dsp.test.mjs` (21 Node tests) mirrors `DSPTests` and also checks that `course.json` is well formed. The site was checked in a browser:
+- **Website:** `web/tests/dsp.test.mjs` (23 Node tests) mirrors `DSPTests` and also checks that `course.json` is well formed. The site was checked in a browser:
   - all 13 lessons render with no console errors
   - no page overflows sideways at 375 px
   - light and dark themes both work
@@ -174,7 +177,7 @@ flowchart TB
 ## Known limits
 
 - **Website:** progress isn't synced between browsers or with the Mac app. Visitors without repo access can't file GitHub issues. The heavy image demos run on the main thread, so the page pauses briefly on slow phones.
-- **Colour demo scope.** Lesson 13 doesn't cover colour spaces or gamuts (Rec.709 vs P3 vs Rec.2020) or HDR transfer functions. Those are mentioned in the text only. White balance models lights as black bodies shifted by a tint, so the spiky spectra of real fluorescent and LED lights (and the colour shifts they cause in particular objects) aren't simulated, and gains are a simple per-channel (von Kries-style) scaling in camera RGB, not a full chromatic-adaptation transform such as Bradford.
+- **Colour demo scope.** The gamut tab is a chromaticity diagram only. It doesn't demonstrate gamut mapping on an image (clip vs. compress), coverage percentages, or the DCI white point, and HDR transfer functions are text only. The horseshoe's colours are the nearest sRGB colours, so its edges are always less saturated than the colours they stand for, even on a P3 screen. Those are mentioned in the text only. White balance models lights as black bodies shifted by a tint, so the spiky spectra of real fluorescent and LED lights (and the colour shifts they cause in particular objects) aren't simulated, and gains are a simple per-channel (von Kries-style) scaling in camera RGB, not a full chromatic-adaptation transform such as Bradford.
 - **Recomputation.** Audio demos recompute synchronously on every slider movement. They're fine at current sizes but would need debouncing for longer signals.
 - **No live input.** There is no microphone or camera input (you chose demos without it).
 - **Two non-standard visual choices:**

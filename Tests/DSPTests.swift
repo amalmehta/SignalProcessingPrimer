@@ -59,8 +59,8 @@ final class DSPTests: XCTestCase {
         let hp = DSP.Biquad(.highPass, cutoff: 2000, q: 0.7071, sampleRate: fs)
         let low = DSP.tone(frequency: 100, sampleRate: fs, count: 8192)
         let out = hp.process(low)
-        let rmsIn = sqrt(low.map { $0 * $0 }.reduce(0, +) / Float(low.count))
-        let rmsOut = sqrt(out[2000...].map { $0 * $0 }.reduce(0, +) / Float(out.count - 2000))
+        func rms(_ x: ArraySlice<Float>) -> Float { sqrt(x.reduce(Float(0)) { $0 + $1 * $1 } / Float(x.count)) }
+        let rmsIn = rms(low[...]), rmsOut = rms(out[2000...])
         XCTAssertLessThan(rmsOut, rmsIn * 0.01)
     }
 
@@ -217,5 +217,33 @@ final class TintTests: XCTestCase {
         XCTAssertEqual(c.r / c.g, 1, accuracy: 0.02); XCTAssertEqual(c.b / c.g, 1, accuracy: 0.02)
         let est = WhiteBalance.estimate(WhiteBalance.sample(shot, x: p.x, y: p.y))
         XCTAssertEqual(est.kelvin, 4000, accuracy: 100); XCTAssertEqual(est.tint, -30, accuracy: 3)
+    }
+}
+
+final class GamutTests: XCTestCase {
+    func testSpectralLocusMatchesCIEValues() {
+        // CIE 1931 2° tabulated chromaticities.
+        let p520 = Gamut.spectral(520), p700 = Gamut.spectral(700)
+        XCTAssertEqual(p520.x, 0.0743, accuracy: 1e-4); XCTAssertEqual(p520.y, 0.8338, accuracy: 1e-4)
+        XCTAssertEqual(p700.x, 0.7347, accuracy: 1e-4); XCTAssertEqual(p700.y, 0.2653, accuracy: 1e-4)
+        // Rec.2020's primaries are the 630, 532 and 467 nm laser lines.
+        for (nm, primary) in [(630.0, Gamut.rec2020.red), (532, Gamut.rec2020.green), (467, Gamut.rec2020.blue)] {
+            let p = Gamut.spectral(nm)
+            XCTAssertEqual(p.x, primary.x, accuracy: 0.005, "\(nm) nm"); XCTAssertEqual(p.y, primary.y, accuracy: 0.005, "\(nm) nm")
+        }
+    }
+
+    func testGamutsNest() {
+        XCTAssertTrue(Gamut.spaces.allSatisfy { Gamut.contains($0, Gamut.d65) })
+        XCTAssertTrue(Gamut.isVisible(Gamut.d65))
+        let srgbGreen = Gamut.XY(x: 0.30, y: 0.59), p3Green = Gamut.XY(x: 0.265, y: 0.68), r2020Green = Gamut.XY(x: 0.175, y: 0.78)
+        XCTAssertTrue(Gamut.contains(Gamut.rec709, srgbGreen) && Gamut.contains(Gamut.p3, srgbGreen))
+        XCTAssertFalse(Gamut.contains(Gamut.rec709, p3Green)); XCTAssertTrue(Gamut.contains(Gamut.p3, p3Green)); XCTAssertTrue(Gamut.contains(Gamut.rec2020, p3Green))
+        XCTAssertFalse(Gamut.contains(Gamut.p3, r2020Green)); XCTAssertTrue(Gamut.contains(Gamut.rec2020, r2020Green))
+        XCTAssertFalse(Gamut.isVisible(Gamut.XY(x: 0.05, y: 0.05)), "below the line of purples")
+        XCTAssertTrue(Gamut.spaces.allSatisfy { s in s.corners.allSatisfy { Gamut.contains(s, $0) } }, "a primary is inside its own gamut")
+        XCTAssertTrue(Gamut.isVisible(Gamut.spectral(532)), "pure spectral light is visible")
+        XCTAssertTrue(Gamut.spaces.allSatisfy { s in s.corners.allSatisfy { Gamut.isVisible(Gamut.XY(x: $0.x * 0.99 + 0.3127 * 0.01, y: $0.y * 0.99 + 0.329 * 0.01)) } },
+                      "every primary is a visible colour")
     }
 }

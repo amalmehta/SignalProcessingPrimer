@@ -32,7 +32,7 @@ To keep it, drag `Signal Processing Primer.app` from `build/Build/Products/Relea
 xcodebuild -project "Signal Processing Primer.xcodeproj" -scheme "Signal Processing Primer" -derivedDataPath build test
 ```
 
-There are 32 tests. 16 check the DSP maths (FFT, aliasing, quantisation SNR, convolution, biquads, the compressor, the DCT/JPEG round trip, image kernels, spectrograms). 4 check colour and gamma (transfer functions, shadow codes, Y′CbCr, chroma subsampling). 6 check white balance (light colour by temperature and tint, camera settings, eyedropper, gray world). 6 check the course content, progress saving and the feedback file.
+There are 34 tests. 16 check the DSP maths (FFT, aliasing, quantisation SNR, convolution, biquads, the compressor, the DCT/JPEG round trip, image kernels, spectrograms). 4 check colour and gamma (transfer functions, shadow codes, Y′CbCr, chroma subsampling). 6 check white balance (light colour by temperature and tint, camera settings, eyedropper, gray world). 2 check gamuts (the spectral locus against CIE values, and which gamuts contain which colours). 6 check the course content, progress saving and the feedback file.
 
 ## Using the app
 
@@ -85,7 +85,7 @@ Block types are `text`, `heading`, `equation` (with optional `caption`), `bullet
 
 ## Screenshots
 
-`scripts/screenshots.sh` opens the built Release app at each lesson's demo and saves `docs/images/lesson-<id>.jpg`. Your terminal needs Screen Recording permission for this. To capture just some lessons, pass their ids, for example `scripts/screenshots.sh jpeg film`. The app accepts these developer launch arguments:
+`scripts/screenshots.sh` opens the built Release app at each lesson's demo and saves `docs/images/lesson-<id>.jpg`. Your terminal needs Screen Recording permission for this. To capture just some lessons, pass their ids, for example `scripts/screenshots.sh jpeg film`. To capture a particular tab of Lesson 13, run `DEMO_PART=gamut scripts/screenshots.sh colour`. The app accepts these developer launch arguments:
 
 | Argument | Effect |
 |---|---|
@@ -93,5 +93,6 @@ Block types are `text`, `heading`, `equation` (with optional `caption`), `bullet
 | `-scrollToDemo YES` | Scrolls to its demo |
 | `-showSettings YES` | Opens Settings |
 | `-showFeedback YES` | Opens the Feedback sheet |
+| `-demoPart gamut` | Opens Lesson 13 on a given tab (`chroma`, `whiteBalance` or `gamut`) |
 
 To regenerate the app icon: `swift scripts/make_icon.swift "Signal Processing Primer/Resources/Assets.xcassets/AppIcon.appiconset"`.

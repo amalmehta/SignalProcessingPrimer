@@ -77,6 +77,10 @@ Decided without asking:
 - Tint (asked for as "the tint slider"; decided without asking): two sliders, light tint
   and camera tint, so there is something to correct; Lightroom convention (−green,
   +magenta), ±100 = Duv ∓0.02; Fluorescent preset at 4,000 K / −25.
+- Gamut (asked: fourth tab in Lesson 13; diagram only). Decided without asking:
+  CIE 1931 spectral locus from the CIE 5 nm table (an analytic fit was too
+  inaccurate), Rec.709/sRGB, DCI-P3 and Rec.2020 triangles, a D65 white point,
+  one added quiz question, and a -demoPart launch argument for screenshots.
 - Progress = passing a lesson's quiz (default 2 of 3, adjustable to 3 of 3).
 - Settings: text size, explanations, pass mark, volume, tone length, demo image,
   reset progress.
@@ -115,3 +119,4 @@ CHANGELOG:
 - 2026-10-06 — added Lesson 13 "Colour, Gamma and Chroma" with a gamma + chroma subsampling demo (Mac app and website)
 - 2026-10-06 — added a white balance demo (third tab of Lesson 13) and a 4th quiz question; pass mark is now "all but one" or "all" correct
 - 2026-10-06 — added green–magenta tint to the white balance demo (light tint, camera tint, Fluorescent preset; Auto and eyedropper estimate tint too)
+- 2026-10-06 — added a colour gamut demo (fourth tab of Lesson 13: CIE 1931 diagram with Rec.709, P3 and Rec.2020) and a 5th quiz question

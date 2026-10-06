@@ -484,14 +484,14 @@ function frameRate(host, ctx) {
 // ---------- Lesson 13: colour & gamma ----------
 function colourGamma(host, ctx) {
   const body = h('div', { class: 'demo-body' });
-  const tabs = h('div', { class: 'segmented three', role: 'radiogroup', 'aria-label': 'Part' });
+  const tabs = h('div', { class: 'segmented four', role: 'radiogroup', 'aria-label': 'Part' });
   let off = null;
   const show = part => {
     off?.(); off = null; body.replaceChildren();
-    off = part === 'gamma' ? gammaPart(body) : part === 'chroma' ? chromaPart(body, ctx) : whiteBalancePart(body, ctx);
+    off = { gamma: () => gammaPart(body), chroma: () => chromaPart(body, ctx), wb: () => whiteBalancePart(body, ctx), gamut: () => gamutPart(body) }[part]();
   };
   const group = `part${++uid}`;
-  [['gamma', 'Gamma'], ['chroma', 'Chroma subsampling'], ['wb', 'White balance']].forEach(([value, label], i) => {
+  [['gamma', 'Gamma'], ['chroma', 'Chroma subsampling'], ['wb', 'White balance'], ['gamut', 'Gamut']].forEach(([value, label], i) => {
     const id = `c${++uid}`, input = h('input', { type: 'radio', name: group, id, value });
     if (!i) input.checked = true;
     input.addEventListener('change', () => show(input.value));
@@ -599,6 +599,94 @@ function whiteBalancePart(host, ctx) {
     ro, h('div', { class: 'images two' }, asLit, result));
   draw();
   return ctx.onImage(draw);
+}
+
+// Categorical slots 1–3 plus a distinct dash per gamut, so lines never rely on colour alone.
+const GAMUT_STYLE = [{ color: 'var(--s1)', dash: [] }, { color: 'var(--s2)', dash: [7, 4] }, { color: 'var(--s3)', dash: [2, 3] }];
+
+function gamutPart(host) {
+  let picked = [0.20, 0.70];
+  const shown = new Set(D.GAMUTS.map(g => g.name));
+  const XMAX = 0.8, YMAX = 0.9, PAD = 30, TOP = 8, RIGHT = 12, W = 380, H = Math.round(W * YMAX / XMAX);   // margins keep edge labels visible
+  const CW = W + PAD + RIGHT, CH = H + 24 + TOP;
+  const canvas = h('canvas', { class: 'gamut-diagram', width: CW * 2, height: CH * 2, role: 'img', 'aria-label': 'CIE 1931 chromaticity diagram with gamut triangles. Click or drag to pick a colour.' });
+  const side = h('div', { class: 'gamut-side' });
+  // Pre-render the coloured horseshoe once.
+  const fill = document.createElement('canvas'); fill.width = W; fill.height = H;
+  { const g = fill.getContext('2d'), img = g.createImageData(W, H);
+    for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
+      const p = [(c + 0.5) / W * XMAX, (1 - (r + 0.5) / H) * YMAX];
+      if (!D.isVisible(p)) continue;
+      const rgb = D.chromaToSRGB(p), o = (r * W + c) * 4;
+      img.data.set([rgb[0] * 255, rgb[1] * 255, rgb[2] * 255, 230], o);
+    }
+    g.putImageData(img, 0, 0); }
+  const toPx = ([x, y]) => [PAD + x / XMAX * W, TOP + (1 - y / YMAX) * H];
+  const draw = () => {
+    const g = canvas.getContext('2d'), cs = getComputedStyle(document.documentElement), ink = cs.getPropertyValue('--muted').trim();
+    g.setTransform(2, 0, 0, 2, 0, 0); g.clearRect(0, 0, CW, CH);
+    g.drawImage(fill, PAD, TOP);
+    g.font = '10px "IBM Plex Mono", monospace'; g.fillStyle = ink; g.strokeStyle = ink; g.textAlign = 'center';
+    g.globalAlpha = 0.2;
+    for (let i = 0; i <= 8; i++) { const x = PAD + i / 8 * W; g.beginPath(); g.moveTo(x, TOP); g.lineTo(x, TOP + H); g.stroke(); }
+    for (let i = 0; i <= 9; i++) { const y = TOP + (1 - i / 9) * H; g.beginPath(); g.moveTo(PAD, y); g.lineTo(PAD + W, y); g.stroke(); }
+    g.globalAlpha = 1;
+    for (let i = 0; i <= 8; i++) g.fillText((i / 10).toFixed(1), PAD + i / 8 * W, TOP + H + 14);
+    g.textAlign = 'right'; for (let i = 0; i <= 9; i++) g.fillText((i / 10).toFixed(1), PAD - 4, TOP + (1 - i / 9) * H + 3);
+    g.beginPath(); D.LOCUS.forEach((p, i) => { const [x, y] = toPx(p); i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.closePath(); g.lineWidth = 1; g.stroke();
+    g.textAlign = 'center'; g.font = '9px "IBM Plex Mono", monospace';
+    const [cx, cy] = toPx(D.D65);
+    for (const nm of [460, 480, 490, 500, 520, 540, 560, 580, 600, 620]) {
+      const [x, y] = toPx(D.spectralXY(nm)), dx = x - cx, dy = y - cy, len = Math.hypot(dx, dy) || 1;
+      g.fillText(String(nm), x + dx / len * 14, y + dy / len * 10 + 3);
+    }
+    D.GAMUTS.forEach((gm, k) => {
+      if (!shown.has(gm.name)) return;
+      g.beginPath(); gm.corners.forEach((p, i) => { const [x, y] = toPx(p); i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.closePath();
+      g.lineJoin = 'round'; g.setLineDash([]); g.strokeStyle = 'rgba(0,0,0,0.55)'; g.lineWidth = 4.5; g.stroke();
+      g.setLineDash(GAMUT_STYLE[k].dash); g.strokeStyle = cs.getPropertyValue(GAMUT_STYLE[k].color.slice(4, -1)).trim(); g.lineWidth = 2.5; g.stroke();
+    });
+    g.setLineDash([]);
+    g.fillStyle = '#000'; g.beginPath(); g.arc(cx, cy, 3, 0, D.TAU); g.fill(); g.font = 'bold 10px system-ui'; g.textAlign = 'left'; g.fillText('D65', cx + 6, cy + 12);
+    const [qx, qy] = toPx(picked);
+    g.lineWidth = 3; g.strokeStyle = '#000'; g.beginPath(); g.arc(qx, qy, 8, 0, D.TAU); g.stroke();
+    g.lineWidth = 1.5; g.strokeStyle = '#fff'; g.stroke();
+    drawSide();
+  };
+  const drawSide = () => {
+    const visible = D.isVisible(picked), rgb = D.chromaToSRGB(picked), in709 = D.gamutContains(D.GAMUTS[0], picked);
+    side.replaceChildren(
+      h('p', { class: 'note' }, 'Click or drag on the diagram to pick a colour.'),
+      h('div', { class: 'readout' }, h('b', {}, `${picked[0].toFixed(3)}, ${picked[1].toFixed(3)}`), h('span', {}, 'Chromaticity (x, y)')),
+      h('div', { class: 'gamut-list' }, D.GAMUTS.map((gm, k) => {
+        const id = `c${++uid}`, cb = h('input', { type: 'checkbox', id });
+        cb.checked = shown.has(gm.name);
+        cb.addEventListener('change', () => { cb.checked ? shown.add(gm.name) : shown.delete(gm.name); draw(); });
+        const inside = D.gamutContains(gm, picked);
+        return h('div', { class: 'gamut-row' }, cb,
+          h('label', { for: id }, h('i', { class: 'swatch-line', style: `border-top: 3px ${GAMUT_STYLE[k].dash.length ? (k === 1 ? 'dashed' : 'dotted') : 'solid'} ${GAMUT_STYLE[k].color}` }), gm.name),
+          h('span', { class: inside ? 'in' : 'out' }, inside ? '✓ Inside' : '✗ Outside'));
+      })),
+      h('p', { class: visible ? '' : 'warn-text' }, visible ? '👁 A colour people can see' : 'Outside human vision: no real light has this colour'),
+      h('div', { class: 'swatch-row' }, h('i', { class: 'swatch', style: `background: rgb(${rgb.map(v => Math.round(v * 255)).join(',')})` }),
+        h('span', { class: 'note' }, in709 ? 'Shown exactly (inside sRGB).' : 'Shown as the nearest sRGB colour; the real colour is more saturated.')),
+      h('div', { class: 'presets' }, h('div', { class: 'eyebrow' }, 'Try'),
+        [['sRGB green', D.GAMUTS[0].corners[1]], ['P3 green', D.GAMUTS[1].corners[1]], ['Rec.2020 green (532 nm laser)', D.GAMUTS[2].corners[1]],
+          ['Cyan 490 nm', D.spectralXY(490)], ['White (D65)', D.D65]].map(([name, p]) =>
+          h('button', { class: 'link', type: 'button', onclick: () => { picked = p; draw(); } }, name))));
+  };
+  const pick = e => {
+    const r = canvas.getBoundingClientRect(), sx = CW / r.width, sy = CH / r.height;
+    const x = ((e.clientX - r.left) * sx - PAD) / W * XMAX, y = (1 - ((e.clientY - r.top) * sy - TOP) / H) * YMAX;
+    picked = [Math.min(Math.max(x, 0), XMAX), Math.min(Math.max(y, 0.001), YMAX)]; draw();
+  };
+  canvas.addEventListener('pointerdown', e => { canvas.setPointerCapture(e.pointerId); pick(e); });
+  canvas.addEventListener('pointermove', e => { if (e.buttons) pick(e); });
+  host.append(h('div', { class: 'gamut-wrap' }, canvas, side));
+  draw();
+  const mq = matchMedia('(prefers-color-scheme: dark)'); mq.addEventListener('change', draw);
+  const mo = new MutationObserver(draw); mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  return () => { mq.removeEventListener('change', draw); mo.disconnect(); };
 }
 
 export const DEMOS = {

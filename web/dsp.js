@@ -582,3 +582,61 @@ export function checkerChart(width = 360) {
 
 /** Centre of the "neutral 6.5" patch (bottom row, third from left). */
 export function grayPatchCentre(width = 360) { const cell = Math.floor(width / 6); return [2 * cell + (cell >> 1), 3 * cell + (cell >> 1)]; }
+
+// ---------- Gamuts (Lesson 13) ----------
+
+export const GAMUTS = [
+  { name: 'Rec.709 / sRGB', corners: [[0.640, 0.330], [0.300, 0.600], [0.150, 0.060]] },
+  { name: 'DCI-P3', corners: [[0.680, 0.320], [0.265, 0.690], [0.150, 0.060]] },
+  { name: 'Rec.2020', corners: [[0.708, 0.292], [0.170, 0.797], [0.131, 0.046]] },
+];
+export const D65 = [0.3127, 0.3290];
+
+// CIE 1931 2° chromaticities of monochromatic light, 380–700 nm in 5 nm steps.
+const SPECTRAL = [
+  0.1741, 0.0050, 0.1740, 0.0050, 0.1738, 0.0049, 0.1736, 0.0049, 0.1733, 0.0048, 0.1730, 0.0048, 0.1726, 0.0048, 0.1721, 0.0048,
+  0.1714, 0.0051, 0.1703, 0.0058, 0.1689, 0.0069, 0.1669, 0.0086, 0.1644, 0.0109, 0.1611, 0.0138, 0.1566, 0.0177, 0.1510, 0.0227,
+  0.1440, 0.0297, 0.1355, 0.0399, 0.1241, 0.0578, 0.1096, 0.0868, 0.0913, 0.1327, 0.0687, 0.2007, 0.0454, 0.2950, 0.0235, 0.4127,
+  0.0082, 0.5384, 0.0039, 0.6548, 0.0139, 0.7502, 0.0389, 0.8120, 0.0743, 0.8338, 0.1142, 0.8262, 0.1547, 0.8059, 0.1929, 0.7816,
+  0.2296, 0.7543, 0.2658, 0.7243, 0.3016, 0.6923, 0.3373, 0.6589, 0.3731, 0.6245, 0.4087, 0.5896, 0.4441, 0.5547, 0.4788, 0.5202,
+  0.5125, 0.4866, 0.5448, 0.4544, 0.5752, 0.4242, 0.6029, 0.3965, 0.6270, 0.3725, 0.6482, 0.3514, 0.6658, 0.3340, 0.6801, 0.3197,
+  0.6915, 0.3083, 0.7006, 0.2993, 0.7079, 0.2920, 0.7140, 0.2859, 0.7190, 0.2809, 0.7230, 0.2770, 0.7260, 0.2740, 0.7283, 0.2717,
+  0.7300, 0.2700, 0.7311, 0.2689, 0.7320, 0.2680, 0.7327, 0.2673, 0.7334, 0.2666, 0.7340, 0.2660, 0.7344, 0.2656, 0.7346, 0.2654,
+  0.7347, 0.2653];
+
+/** Chromaticity of pure light at `nm` (linear interpolation of the CIE table). */
+export function spectralXY(nm) {
+  const f = (Math.min(Math.max(nm, 380), 700) - 380) / 5, i = Math.min(Math.floor(f), 63), t = f - i;
+  return [SPECTRAL[2 * i] + (SPECTRAL[2 * i + 2] - SPECTRAL[2 * i]) * t, SPECTRAL[2 * i + 1] + (SPECTRAL[2 * i + 3] - SPECTRAL[2 * i + 1]) * t];
+}
+
+/** Spectral locus, 380–700 nm; closing it back to 380 nm draws the line of purples. */
+export const LOCUS = Array.from({ length: SPECTRAL.length / 2 }, (_, i) => [SPECTRAL[2 * i], SPECTRAL[2 * i + 1]]);
+
+export function inPolygon([px, py], poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [ax, ay] = poly[i], [bx, by] = poly[j];
+    if ((ay > py) !== (by > py) && px < (bx - ax) * (py - ay) / (by - ay) + ax) inside = !inside;
+  }
+  return inside;
+}
+function nearEdge([px, py], poly, tol = 1e-4) {
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [ax, ay] = poly[j], [bx, by] = poly[i], dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy;
+    const t = len2 ? Math.min(Math.max(((px - ax) * dx + (py - ay) * dy) / len2, 0), 1) : 0;
+    if (Math.hypot(ax + t * dx - px, ay + t * dy - py) <= tol) return true;
+  }
+  return false;
+}
+/** Points on an edge or corner count as inside (a primary is in its own gamut). */
+export const gamutContains = (g, p) => inPolygon(p, g.corners) || nearEdge(p, g.corners);
+export const isVisible = p => inPolygon(p, LOCUS) || nearEdge(p, LOCUS);
+
+/** Nearest displayable sRGB colour for a chromaticity: clip negatives, scale so the largest channel is 1. */
+export function chromaToSRGB([x, y]) {
+  const X = x / y, Z = (1 - x - y) / y;
+  const lin = [3.2406 * X - 1.5372 - 0.4986 * Z, -0.9689 * X + 1.8758 + 0.0415 * Z, 0.0557 * X - 0.2040 + 1.0570 * Z].map(v => Math.max(v, 0));
+  const m = Math.max(...lin, 1e-9);
+  return lin.map(v => encodeTransfer('sRGB', v / m));
+}

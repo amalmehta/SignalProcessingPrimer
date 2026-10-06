@@ -238,19 +238,21 @@ struct RGBImageView: View {
 
 struct ColourGammaDemo: View {
     enum Part: String, CaseIterable, Identifiable {
-        case gamma = "Gamma", chroma = "Chroma subsampling", whiteBalance = "White balance"
+        case gamma = "Gamma", chroma = "Chroma subsampling", whiteBalance = "White balance", gamut = "Gamut"
         var id: String { rawValue }
     }
-    @State private var part = Part.gamma
+    /// `-demoPart gamut` (or chroma / whiteBalance) on the command line opens that tab (used for screenshots).
+    @State private var part = Part.allCases.first { "\($0)" == UserDefaults.standard.string(forKey: "demoPart") } ?? .gamma
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Picker("Part", selection: $part) { ForEach(Part.allCases) { Text($0.rawValue).tag($0) } }
-                .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 480)
+                .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 560)
             switch part {
             case .gamma: GammaPart()
             case .chroma: ChromaPart()
             case .whiteBalance: WhiteBalancePart()
+            case .gamut: GamutPart()
             }
         }
     }
@@ -479,5 +481,123 @@ private struct WhiteBalancePart: View {
         gains = WhiteBalance.gains(neutral: c)
         let e = WhiteBalance.estimate(c)
         setting = .picked(e.kelvin, e.tint)
+    }
+}
+
+private struct GamutPart: View {
+    @State private var picked = Gamut.XY(x: 0.20, y: 0.70)
+    @State private var shown: Set<String> = Set(Gamut.spaces.map(\.name))
+    @Environment(\.colorScheme) private var scheme
+    private static let fill = Gamut.diagramImage(width: 360)
+    private static let xMax = 0.8, yMax = 0.9
+
+    /// Categorical slots 1–3 plus a distinct dash per gamut, so lines never rely on colour alone.
+    private func style(_ s: Gamut.Space) -> (Color, [CGFloat]) {
+        switch s.name {
+        case Gamut.rec709.name: return (.series1, [])
+        case Gamut.p3.name: return (.series2, [7, 4])
+        default: return (Color(nsColor: NSColor(name: nil) { $0.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(hex: "#199e70") : NSColor(hex: "#1baf7a") }), [2, 3])
+        }
+    }
+
+    private static let presets: [(String, Gamut.XY)] = [
+        ("sRGB green", Gamut.rec709.green), ("P3 green", Gamut.p3.green), ("Rec.2020 green (532 nm laser)", Gamut.rec2020.green),
+        ("Cyan 490 nm", Gamut.spectral(490)), ("White (D65)", Gamut.d65)]
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 24) {
+            diagram.frame(width: 392, height: 380 * Self.yMax / Self.xMax + 32)
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Click or drag on the diagram to pick a colour.").font(.callout).foregroundStyle(.secondary)
+                Readout(label: "Chromaticity (x, y)", value: String(format: "%.3f, %.3f", picked.x, picked.y))
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(Gamut.spaces) { s in
+                        let inside = Gamut.contains(s, picked), st = style(s)
+                        HStack(spacing: 8) {
+                            Toggle(isOn: Binding(get: { shown.contains(s.name) }, set: { if $0 { shown.insert(s.name) } else { shown.remove(s.name) } })) { EmptyView() }
+                                .toggleStyle(.checkbox).labelsHidden()
+                                .accessibilityLabel("Show \(s.name)")
+                            Path { p in p.move(to: .zero); p.addLine(to: CGPoint(x: 22, y: 0)) }
+                                .stroke(st.0, style: StrokeStyle(lineWidth: 2.5, dash: st.1)).frame(width: 22, height: 2)
+                            Text(s.name).frame(width: 110, alignment: .leading)
+                            Label(inside ? "Inside" : "Outside", systemImage: inside ? "checkmark.circle.fill" : "xmark.circle")
+                                .foregroundStyle(inside ? Color.green : Color.secondary)
+                        }
+                    }
+                    let visible = Gamut.isVisible(picked)
+                    Label(visible ? "A colour people can see" : "Outside human vision (no real light has this colour)",
+                          systemImage: visible ? "eye" : "eye.slash")
+                        .foregroundStyle(visible ? Color.primary : Color.orange).font(.callout)
+                }
+                HStack(spacing: 10) {
+                    let c = Gamut.displayRGB(picked)
+                    RoundedRectangle(cornerRadius: 6).fill(Color(.sRGB, red: c.r, green: c.g, blue: c.b))
+                        .frame(width: 56, height: 36).overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.separator))
+                    Text(Gamut.contains(Gamut.rec709, picked) ? "Shown exactly (inside sRGB)." : "Shown as the nearest sRGB colour; the real colour is more saturated.")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Try").font(.caption).foregroundStyle(.secondary)
+                    ForEach(Self.presets, id: \.0) { name, xy in Button(name) { picked = xy }.buttonStyle(.link) }
+                }
+            }
+        }
+    }
+
+    private var diagram: some View {
+        GeometryReader { geo in
+            let top = 8.0, w = geo.size.width - 30 - 12, h = geo.size.height - 24 - top   // margins keep edge labels visible
+            let toPoint = { (p: Gamut.XY) in CGPoint(x: 30 + p.x / Self.xMax * w, y: top + (1 - p.y / Self.yMax) * h) }
+            ZStack(alignment: .topLeading) {
+                if let img = Self.fill {
+                    Image(decorative: img, scale: 1).resizable().frame(width: w, height: h).offset(x: 30, y: top).opacity(0.9)
+                }
+                Canvas { ctx, _ in
+                    let ink = Color.secondary
+                    // Grid and ticks.
+                    for i in 0...8 {
+                        let x = 30 + Double(i) / 8 * w
+                        ctx.stroke(Path { $0.move(to: CGPoint(x: x, y: top)); $0.addLine(to: CGPoint(x: x, y: top + h)) }, with: .color(ink.opacity(0.15)))
+                        ctx.draw(Text(String(format: "%.1f", Double(i) / 10)).font(.caption2.monospacedDigit()).foregroundStyle(ink), at: CGPoint(x: x, y: top + h + 10))
+                    }
+                    for i in 0...9 {
+                        let y = top + (1 - Double(i) / 9) * h
+                        ctx.stroke(Path { $0.move(to: CGPoint(x: 30, y: y)); $0.addLine(to: CGPoint(x: 30 + w, y: y)) }, with: .color(ink.opacity(0.15)))
+                        ctx.draw(Text(String(format: "%.1f", Double(i) / 10)).font(.caption2.monospacedDigit()).foregroundStyle(ink), at: CGPoint(x: 14, y: y))
+                    }
+                    // Spectral locus outline + wavelength labels.
+                    var locus = Path()
+                    for (i, p) in Gamut.locus.enumerated() { i == 0 ? locus.move(to: toPoint(p)) : locus.addLine(to: toPoint(p)) }
+                    locus.closeSubpath()
+                    ctx.stroke(locus, with: .color(ink), lineWidth: 1)
+                    for nm in [460.0, 480, 490, 500, 520, 540, 560, 580, 600, 620] {
+                        let p = toPoint(Gamut.spectral(nm)), c = toPoint(Gamut.d65)
+                        let dx = p.x - c.x, dy = p.y - c.y, len = max((dx * dx + dy * dy).squareRoot(), 1)
+                        ctx.draw(Text("\(Int(nm))").font(.system(size: 9).monospacedDigit()).foregroundStyle(ink),
+                                 at: CGPoint(x: p.x + dx / len * 14, y: p.y + dy / len * 10))
+                    }
+                    // Gamut triangles: dark halo under a coloured, dashed line.
+                    for s in Gamut.spaces where shown.contains(s.name) {
+                        let st = style(s)
+                        var tri = Path(); tri.addLines(s.corners.map(toPoint)); tri.closeSubpath()
+                        ctx.stroke(tri, with: .color(.black.opacity(0.55)), style: StrokeStyle(lineWidth: 4.5, lineJoin: .round))
+                        ctx.stroke(tri, with: .color(st.0), style: StrokeStyle(lineWidth: 2.5, lineJoin: .round, dash: st.1))
+                    }
+                    // White point and the picked colour.
+                    let d = toPoint(Gamut.d65)
+                    ctx.fill(Path(ellipseIn: CGRect(x: d.x - 3, y: d.y - 3, width: 6, height: 6)), with: .color(.black))
+                    ctx.draw(Text("D65").font(.caption2.bold()).foregroundStyle(.black), at: CGPoint(x: d.x + 16, y: d.y + 8))
+                    let q = toPoint(picked)
+                    ctx.stroke(Path(ellipseIn: CGRect(x: q.x - 8, y: q.y - 8, width: 16, height: 16)), with: .color(.black), lineWidth: 3)
+                    ctx.stroke(Path(ellipseIn: CGRect(x: q.x - 8, y: q.y - 8, width: 16, height: 16)), with: .color(.white), lineWidth: 1.5)
+                }
+                .contentShape(Rectangle())
+                .gesture(DragGesture(minimumDistance: 0).onChanged { v in
+                    let x = (v.location.x - 30) / w * Self.xMax, y = (1 - (v.location.y - top) / h) * Self.yMax
+                    picked = Gamut.XY(x: min(max(x, 0), Self.xMax), y: min(max(y, 0.001), Self.yMax))
+                })
+                .accessibilityLabel("CIE 1931 chromaticity diagram with gamut triangles")
+            }
+        }
     }
 }

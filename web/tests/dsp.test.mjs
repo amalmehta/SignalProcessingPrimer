@@ -166,3 +166,21 @@ test('tint: green lowers R/G and B/G, magenta raises them; camera tint cancels l
   const est = D.estimateLight(D.sampleLinear(shot, px, py));
   near(est.kelvin, 4000, 100); near(est.tint, -30, 3);
 });
+
+test('gamut: spectral locus matches CIE; Rec.2020 primaries are 630/532/467 nm', () => {
+  const p520 = D.spectralXY(520), p700 = D.spectralXY(700);
+  near(p520[0], 0.0743, 1e-4); near(p520[1], 0.8338, 1e-4); near(p700[0], 0.7347, 1e-4);
+  const r2020 = D.GAMUTS[2].corners;
+  [[630, 0], [532, 1], [467, 2]].forEach(([nm, k]) => { const p = D.spectralXY(nm); near(p[0], r2020[k][0], 0.005); near(p[1], r2020[k][1], 0.005); });
+});
+
+test('gamut: containment nests and white is inside everything', () => {
+  const [g709, p3, g2020] = D.GAMUTS;
+  assert.ok(D.GAMUTS.every(g => D.gamutContains(g, D.D65)) && D.isVisible(D.D65));
+  const p3Green = [0.265, 0.68], r2020Green = [0.175, 0.78];
+  assert.ok(!D.gamutContains(g709, p3Green) && D.gamutContains(p3, p3Green) && D.gamutContains(g2020, p3Green));
+  assert.ok(!D.gamutContains(p3, r2020Green) && D.gamutContains(g2020, r2020Green));
+  assert.ok(!D.isVisible([0.05, 0.05]));
+  assert.ok(D.GAMUTS.every(g => g.corners.every(c => D.gamutContains(g, c))), 'a primary is inside its own gamut');
+  assert.ok(D.isVisible(D.spectralXY(532)));
+});

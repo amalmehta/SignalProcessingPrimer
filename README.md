@@ -13,14 +13,14 @@ A course on signal processing for audio, images, video and film, as a Mac app an
 | ![Spectrogram demo](docs/images/lesson-spectrogram.jpg) | ![Filter demo](docs/images/lesson-filters.jpg) | ![Image kernels demo](docs/images/lesson-images.jpg) |
 | **Compression (DCT)** | **Compressor** | **Frame rate and shutter** |
 | ![JPEG demo](docs/images/lesson-jpeg.jpg) | ![Compressor demo](docs/images/lesson-dynamics.jpg) | ![Wagon-wheel demo](docs/images/lesson-film.jpg) |
-| **Colour, gamma and white balance** | | |
-| ![Colour and gamma demo](docs/images/lesson-colour.jpg) | | |
+| **Colour, gamma and white balance** | **Colour gamuts** | |
+| ![Colour and gamma demo](docs/images/lesson-colour.jpg) | ![Gamut diagram](docs/images/lesson-colour-gamut.jpg) | |
 
 ```mermaid
 flowchart LR
     A["Foundations<br/>signals · sampling · bit depth"] --> B["Frequency domain<br/>FFT · windows · spectrograms"]
     B --> C["Filtering<br/>convolution · EQ · compressors"]
-    C --> D["Images, video and film<br/>2-D filters · DCT/JPEG · frame rate and shutter · colour, gamma and white balance"]
+    C --> D["Images, video and film<br/>2-D filters · DCT/JPEG · frame rate and shutter · colour, gamma, white balance and gamuts"]
 ```
 
 **Links:** [Website](https://claude.ai/artifact/4mZjs9pvjHnj2D5RcxiPtu) · [Setup and use](docs/INSTRUCTIONS.md) · [System design](docs/SYSTEM-DESIGN.md) · [File structure](docs/FILE-STRUCTURE.md) · [Original brief](signal_processing_primer.md)
