@@ -1,14 +1,14 @@
 import Foundation
 
 /// The course is plain data: modules → lessons → blocks + one demo + a quiz.
-struct Module: Identifiable, Hashable {
+struct Module: Identifiable, Hashable, Codable {
     let id: String
     let title: String
     let icon: String          // SF Symbol
     let lessons: [Lesson]
 }
 
-struct Lesson: Identifiable, Hashable {
+struct Lesson: Identifiable, Hashable, Codable {
     let id: String
     let title: String
     let summary: String
@@ -34,15 +34,16 @@ enum Block: Hashable {
     case demo
 }
 
-struct QuizQuestion: Hashable, Identifiable {
+struct QuizQuestion: Hashable, Identifiable, Codable {
     var id: String { prompt }
+    private enum CodingKeys: String, CodingKey { case prompt, choices, answer, explanation }
     let prompt: String
     let choices: [String]
     let answer: Int
     let explanation: String
 }
 
-enum DemoKind: String, CaseIterable {
+enum DemoKind: String, CaseIterable, Codable {
     case sineMixer, aliasing, quantization
     case spectrum, windowing, spectrogram
     case convolution, filterDesigner, compressor
@@ -66,5 +67,43 @@ extension Course {
     static func next(after lesson: Lesson) -> Lesson? {
         guard let i = allLessons.firstIndex(of: lesson), i + 1 < allLessons.count else { return nil }
         return allLessons[i + 1]
+    }
+}
+
+/// JSON shape: `{"type": "text", "text": "…"}`, `{"type": "equation", "text": "…", "caption": "…"}`,
+/// `{"type": "bullets", "items": […]}`, `{"type": "inPractice", "title": "…", "body": "…"}`,
+/// `{"type": "heading", "text": "…"}`, `{"type": "demo"}`. The website reads the same file.
+extension Block: Codable {
+    private enum Key: String, CodingKey { case type, text, caption, items, title, body }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: Key.self)
+        switch try c.decode(String.self, forKey: .type) {
+        case "text":       self = .text(try c.decode(String.self, forKey: .text))
+        case "heading":    self = .heading(try c.decode(String.self, forKey: .text))
+        case "equation":   self = .equation(try c.decode(String.self, forKey: .text),
+                                            caption: try c.decodeIfPresent(String.self, forKey: .caption))
+        case "bullets":    self = .bullets(try c.decode([String].self, forKey: .items))
+        case "inPractice": self = .inPractice(title: try c.decode(String.self, forKey: .title),
+                                              body: try c.decode(String.self, forKey: .body))
+        case "demo":       self = .demo
+        case let other:
+            throw DecodingError.dataCorruptedError(forKey: .type, in: c, debugDescription: "Unknown block type \(other)")
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: Key.self)
+        switch self {
+        case .text(let t):            try c.encode("text", forKey: .type); try c.encode(t, forKey: .text)
+        case .heading(let t):         try c.encode("heading", forKey: .type); try c.encode(t, forKey: .text)
+        case .equation(let t, let cap):
+            try c.encode("equation", forKey: .type); try c.encode(t, forKey: .text)
+            try c.encodeIfPresent(cap, forKey: .caption)
+        case .bullets(let items):     try c.encode("bullets", forKey: .type); try c.encode(items, forKey: .items)
+        case .inPractice(let t, let b):
+            try c.encode("inPractice", forKey: .type); try c.encode(t, forKey: .title); try c.encode(b, forKey: .body)
+        case .demo:                   try c.encode("demo", forKey: .type)
+        }
     }
 }

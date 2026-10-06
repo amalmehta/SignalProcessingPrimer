@@ -1,8 +1,12 @@
 # Signal Processing Primer
 
-A Mac app that teaches signal processing for audio, images, video and film. It has 12 lessons, and each one has a demo you can play with and listen to, plus a short quiz.
+A course on signal processing for audio, images, video and film, as a Mac app and a website. It has 12 lessons, and each one has a demo you can play with and listen to, plus a short quiz.
 
-![Sampling and Aliasing lesson](docs/images/lesson-sampling.jpg)
+**Website:** [claude.ai/artifact/4mZjs9pvjHnj2D5RcxiPtu](https://claude.ai/artifact/4mZjs9pvjHnj2D5RcxiPtu) (private until you share it)
+
+![Sampling and Aliasing lesson in the Mac app](docs/images/lesson-sampling.jpg)
+
+![The website's course overview](docs/images/web-welcome.jpg)
 
 | Spectrograms | Filter design | Image kernels |
 |---|---|---|
@@ -17,4 +21,4 @@ flowchart LR
     C --> D["Images, video and film<br/>2-D filters · DCT/JPEG · frame rate and shutter"]
 ```
 
-**Links:** [Setup and use](docs/INSTRUCTIONS.md) · [System design](docs/SYSTEM-DESIGN.md) · [File structure](docs/FILE-STRUCTURE.md) · [Original brief](signal_processing_primer.md)
+**Links:** [Website](https://claude.ai/artifact/4mZjs9pvjHnj2D5RcxiPtu) · [Setup and use](docs/INSTRUCTIONS.md) · [System design](docs/SYSTEM-DESIGN.md) · [File structure](docs/FILE-STRUCTURE.md) · [Original brief](signal_processing_primer.md)

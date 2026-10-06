@@ -24,6 +24,7 @@
 		A6FBF48A85F7ADB226064CD8 /* DemoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 238F175D63334ECB8B3E72F3 /* DemoView.swift */; };
 		AD0B546E375B055D3D35DB4A /* DSPTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D343F408AFFA0C5CF88029D5 /* DSPTests.swift */; };
 		BD1739B9781D9BCEC15B8B73 /* CourseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B53FDFE4B01462E283338E5 /* CourseTests.swift */; };
+		BEE2A4A9F6A0A829BA149D98 /* course.json in Resources */ = {isa = PBXBuildFile; fileRef = 0007B990A5040ABE4674C39E /* course.json */; };
 		C57B0D508D7E3A1ACF3330BA /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71CE10ABAD77D33F893699E4 /* ContentView.swift */; };
 		D8F42324FF6F6282910F85A1 /* PictureDemos.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21FE41303472C248759CBE1B /* PictureDemos.swift */; };
 		D918D95D113791E54E55E10F /* DSP.swift in Sources */ = {isa = PBXBuildFile; fileRef = B46FAF6B00F55981D5A40032 /* DSP.swift */; };
@@ -40,6 +41,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		0007B990A5040ABE4674C39E /* course.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = course.json; sourceTree = "<group>"; };
 		0CA9283028577BFEDC743B84 /* Signal Processing Primer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Signal Processing Primer.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		1AD819E0E8FCF2894E4E50D0 /* TonePlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TonePlayer.swift; sourceTree = "<group>"; };
 		209E09DE31A4000990B4CD71 /* FilteringDemos.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilteringDemos.swift; sourceTree = "<group>"; };
@@ -90,6 +92,7 @@
 		15ED719284174DEDEEE0C3A6 = {
 			isa = PBXGroup;
 			children = (
+				ED825EBC073816E580AEBFC8 /* content */,
 				9F1F7FFCE057BC2AD3680716 /* Signal Processing Primer */,
 				69EB0902B8D76EE2761AE573 /* Tests */,
 				DD68C6F0EAAC19E52BE769A0 /* Products */,
@@ -171,6 +174,14 @@
 				B441E15FE37464F6231F3CF7 /* Assets.xcassets */,
 			);
 			path = Resources;
+			sourceTree = "<group>";
+		};
+		ED825EBC073816E580AEBFC8 /* content */ = {
+			isa = PBXGroup;
+			children = (
+				0007B990A5040ABE4674C39E /* course.json */,
+			);
+			path = content;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -255,6 +266,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				96F95B1BE580EC5006463413 /* Assets.xcassets in Resources */,
+				BEE2A4A9F6A0A829BA149D98 /* course.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

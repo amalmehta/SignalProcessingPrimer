@@ -49,9 +49,39 @@ There are 22 tests. 16 check the DSP maths (FFT, aliasing, quantisation SNR, con
   - **Save** appends it to `~/Library/Application Support/Signal Processing Primer/Feedback.jsonl`.
   - **Open as GitHub Issue** opens a pre-filled issue in your browser. Nothing is posted until you submit it there.
 
+## The website
+
+The website is published as a private Artifact: <https://claude.ai/artifact/4mZjs9pvjHnj2D5RcxiPtu>. Only you can open it until you share it from the page's Share menu.
+
+It has the same 12 lessons, demos, quizzes, settings and feedback as the Mac app.
+- **Settings:** the gear button, or ⌘, while the page has focus.
+- **Feedback:** the small *Feedback* tab on the right edge, or ⇧⌘F.
+- **Saved data:** progress and settings are saved in each visitor's own browser. A photo you load for the picture demos is kept only for that browser tab.
+- **Feedback for visitors:** filing a GitHub issue needs access to the private repo. Visitors without access can use **Copy text** and send their feedback another way.
+
+**Run it locally.** Use this server, which wraps the page the same way the Artifact host does and serves the shared `content/course.json`:
+
+```bash
+python3 scripts/serve_web.py 8000
+```
+
+Then open <http://localhost:8000/>. Opening `web/index.html` directly from disk won't work, because browsers block loading `course.json` from a `file://` page.
+
+**Test the web maths and content** (Node 18 or later):
+
+```bash
+node --test web/tests/dsp.test.mjs
+```
+
+**Republish** after editing `web/` or `content/course.json`: ask Claude to "republish the website". It publishes `web/index.html` with `styles.css`, `app.js`, `demos.js`, `dsp.js`, `plot.js` and `content/course.json` (as `course.json`) to the same URL.
+
 ## Changing the course
 
-Lesson text and quizzes are plain Swift data in `Signal Processing Primer/Course/CourseContent.swift`. Edit it and rebuild. `CourseTests` will catch an invalid quiz answer, a missing demo or a missing *In practice* box.
+All lesson text and quizzes live in one file, `content/course.json`, which both the Mac app and the website read. Edit it, then:
+- **Mac app:** rebuild; the file is bundled at build time.
+- **Website:** reload the local server, or republish.
+
+Block types are `text`, `heading`, `equation` (with optional `caption`), `bullets`, `inPractice` and `demo`. Text supports `**bold**`, `*italic*` and `` `code` ``. `CourseTests` (Swift) and the Node test both catch an invalid quiz answer, a missing demo or a missing *In practice* box.
 
 ## Screenshots
 

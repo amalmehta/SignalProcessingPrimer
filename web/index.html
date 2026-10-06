@@ -1,0 +1,91 @@
+<title>Signal Processing Primer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<link rel="stylesheet" href="styles.css">
+
+<header class="topbar">
+  <button id="nav-toggle" class="icon-btn" type="button" aria-label="Show lessons" aria-controls="sidebar">☰</button>
+  <a class="brand" href="#">Signal Processing Primer</a>
+  <button class="icon-btn" type="button" data-open="settings" aria-label="Settings" title="Settings (⌘,)">⚙</button>
+</header>
+
+<div class="shell">
+  <aside id="sidebar" class="sidebar" aria-label="Lessons">
+    <div class="sidebar-head">
+      <a class="brand" href="#"><span class="mark" aria-hidden="true"></span>Signal Processing Primer</a>
+      <button class="icon-btn" type="button" data-open="settings" aria-label="Settings" title="Settings (⌘,)">⚙</button>
+    </div>
+    <nav id="lesson-nav"></nav>
+    <div class="sidebar-foot">
+      <label for="progress-bar" id="progress-text">0 of 12 lessons complete</label>
+      <progress id="progress-bar" value="0" max="12"></progress>
+    </div>
+  </aside>
+
+  <main id="main" tabindex="-1">
+    <p class="loading">Loading the course…</p>
+  </main>
+</div>
+
+<button class="feedback-tab" type="button" data-open="feedback" title="Send feedback (⇧⌘F)">Feedback</button>
+
+<dialog id="settings" aria-labelledby="settings-h">
+  <form method="dialog" class="dlg">
+    <header><h2 id="settings-h">Settings</h2><button class="icon-btn" data-close type="button" aria-label="Close">✕</button></header>
+    <fieldset>
+      <legend>Reading</legend>
+      <div class="field"><label for="set-text">Lesson text size</label>
+        <select id="set-text"><option>Small</option><option>Medium</option><option>Large</option><option>Extra Large</option></select></div>
+      <div class="field"><label for="set-explain">Explain answers after checking</label><input id="set-explain" type="checkbox" role="switch"></div>
+      <div class="field"><label for="set-pass">To complete a lesson</label>
+        <select id="set-pass"><option value="2">2 of 3 correct</option><option value="3">3 of 3 correct</option></select></div>
+    </fieldset>
+    <fieldset>
+      <legend>Sound</legend>
+      <div class="field"><label for="set-volume">Demo volume</label><input id="set-volume" type="range" min="0" max="1" step="0.01"></div>
+      <div class="field"><label for="set-tone">Tone length <output id="set-tone-out" for="set-tone"></output></label><input id="set-tone" type="range" min="0.5" max="4" step="0.5"></div>
+      <div class="field"><span>Check your speakers</span><button id="set-test" class="btn" type="button">▶ Test sound</button></div>
+    </fieldset>
+    <fieldset>
+      <legend>Images</legend>
+      <div class="field"><span>Picture demos use</span><b id="set-image-name">Built-in test card</b></div>
+      <div class="field"><label for="set-image" class="btn">Choose image…</label><input id="set-image" type="file" accept="image/*" class="visually-hidden">
+        <button id="set-image-reset" class="btn ghost" type="button">Use test card</button></div>
+      <p class="note">Your photo stays in this browser tab. It is converted to grayscale and scaled to 360 px.</p>
+    </fieldset>
+    <fieldset>
+      <legend>Progress</legend>
+      <div class="field"><span>Lessons completed</span><b id="set-progress">0 of 12</b></div>
+      <div class="field"><span>Progress is saved in this browser only.</span><button id="reset-ask" class="btn ghost" type="button">Reset progress…</button></div>
+      <div id="reset-confirm" class="confirm" hidden>
+        <span>Reset all lesson progress and quiz scores?</span>
+        <button id="reset-yes" class="btn danger" type="button">Reset</button>
+        <button id="reset-no" class="btn ghost" type="button">Cancel</button>
+      </div>
+    </fieldset>
+  </form>
+</dialog>
+
+<dialog id="feedback" aria-labelledby="fb-h">
+  <form method="dialog" class="dlg">
+    <header><h2 id="fb-h">Send feedback</h2><button class="icon-btn" data-close type="button" aria-label="Close">✕</button></header>
+    <p id="fb-about" class="note">About the course in general</p>
+    <div class="segmented" role="radiogroup" aria-label="Feedback type">
+      <label><input type="radio" name="fb-kind" value="Suggestion" checked><span>Suggestion</span></label>
+      <label><input type="radio" name="fb-kind" value="Mistake in a lesson"><span>Mistake</span></label>
+      <label><input type="radio" name="fb-kind" value="Bug"><span>Bug</span></label>
+      <label><input type="radio" name="fb-kind" value="Other"><span>Other</span></label>
+    </div>
+    <label for="fb-text" class="visually-hidden">Your feedback</label>
+    <textarea id="fb-text" rows="6" placeholder="What would make this lesson better?"></textarea>
+    <p class="note">“Open as GitHub issue” opens a pre-filled issue in a new tab; nothing is posted until you submit it there. The repository is private, so you need access to it. Otherwise, copy the text and send it another way.</p>
+    <div class="dlg-actions">
+      <span id="fb-status" class="note" role="status"></span>
+      <button id="fb-copy" class="btn ghost" type="button">Copy text</button>
+      <a id="fb-issue" class="btn primary" href="#" target="_blank" rel="noopener" aria-disabled="true">Open as GitHub issue</a>
+    </div>
+  </form>
+</dialog>
+
+<script type="module" src="app.js"></script>

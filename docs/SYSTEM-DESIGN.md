@@ -1,6 +1,22 @@
 # System Design
 
-Signal Processing Primer is a single-window native macOS app (SwiftUI, macOS 14+). It has no server, no network calls and no third-party dependencies. Everything it needs is in the app bundle, and the course content is compiled in as Swift data.
+Signal Processing Primer comes in two forms that share one content file, `content/course.json`:
+
+- **The Mac app:** a single-window native macOS app (SwiftUI, macOS 14+). It has no server, no network calls and no third-party dependencies. `course.json` is bundled into the app at build time.
+- **The website:** plain HTML, CSS and ES-module JavaScript in `web/`, published as a private claude.ai Artifact. It is a port of the Mac app: the same lessons, demos, quiz rules, settings and feedback, with the maths ported from Swift to `web/dsp.js` and checked by matching tests.
+
+```mermaid
+flowchart LR
+    JSON[("content/course.json<br/>lessons · quizzes")]
+    JSON -- "bundled at build time" --> Mac["Mac app<br/>SwiftUI + Accelerate + AVAudioEngine"]
+    JSON -- "published as course.json, fetched at load" --> Web["Website<br/>HTML/CSS/JS + Web Audio + SVG/canvas"]
+    SwiftTests["Swift tests<br/>DSPTests · CourseTests"] -.-> Mac
+    NodeTests["Node tests<br/>web/tests/dsp.test.mjs"] -.-> Web
+    SwiftTests -.-> JSON
+    NodeTests -.-> JSON
+```
+
+The sections below describe the Mac app first, then the website.
 
 ## Architecture
 
@@ -75,7 +91,7 @@ flowchart TB
 
 | Data | Location |
 |---|---|
-| Course text and quizzes | Compiled into the app (`CourseContent.swift`) |
+| Course text and quizzes | `content/course.json`, bundled into the app and loaded by `CourseContent.swift` |
 | Preferences | `UserDefaults` (domain `com.amalmehta.SignalProcessingPrimer`) |
 | Progress | `UserDefaults`, key `progress.v1`, JSON |
 | Feedback | `~/Library/Application Support/Signal Processing Primer/Feedback.jsonl` |
@@ -86,7 +102,7 @@ Nothing leaves the Mac unless you click **Open as GitHub Issue** and submit the 
 ## Key decisions and trade-offs
 
 - **Native SwiftUI rather than web content in a shell.** It feels like a real Mac app, gets fast vDSP maths and gives low-latency audio. The cost is that the later website will be a separate build (see Known limits).
-- **Content as Swift data, not Markdown files.** The compiler and `CourseTests` check every lesson: valid answer indices, exactly one demo, an *In practice* box and unique ids. Writers have to edit Swift literals, which is a small cost for 12 lessons.
+- **One JSON content file for both versions.** Editing `content/course.json` updates the Mac app and the website together, so they can't drift apart. The trade-off is losing compile-time checks, so `CourseTests` (Swift) and the Node test both check every lesson: valid answer indices, exactly one demo, an *In practice* box and unique ids. In the Mac app, a malformed file fails an assertion in Debug builds and leaves the course empty in Release.
 - **Pure engine functions.** All maths is in stateless functions on plain arrays. That makes it easy to unit-test and to reuse in a future website port, at the cost of recomputing on every redraw. This is fine at these sizes: FFTs of 4,096 points or fewer, about 2 s of audio, images of 360 px or less.
 - **Compute in the view body for audio demos.** It keeps the code simple, and the results come back in well under a frame on modern Macs. Image filtering and JPEG are slower (up to about 0.3 s in Debug builds), so they run in a detached task.
 - **Generated test material.** Tones, drum loops, chirps and the test card are all synthesised, so there are no licensing questions and the repo stays small. Users can still load their own photo.
@@ -113,10 +129,45 @@ Nothing leaves the Mac unless you click **Open as GitHub Issue** and submit the 
   - a spectrogram of a chirp rises over time
 - `CourseTests` (6) check the course shape (4 modules, 12 lessons), every lesson's integrity, unique ids with every demo used exactly once, the navigation helpers, `ProgressStore` persistence and pass mark (using an isolated `UserDefaults` suite), and the feedback file and issue URL.
 - **Visual check:** `scripts/screenshots.sh` opens each lesson at its demo and captures it. All 12 demos, Settings and the Feedback sheet were reviewed this way.
+- **Website:** `web/tests/dsp.test.mjs` (14 Node tests) mirrors `DSPTests` and also checks that `course.json` is well formed. The site was checked in a browser:
+  - all 12 lessons render with no console errors
+  - no page overflows sideways at 375 px
+  - light and dark themes both work
+  - quiz pass and fail paths work, and progress is saved
+  - the Settings dialog opens, and the feedback issue link is built correctly
+
+## Website
+
+```mermaid
+flowchart TB
+    Host["Artifact host<br/>(wraps index.html in a page skeleton)"] --> Index["index.html<br/>sidebar · main · Settings + Feedback dialogs"]
+    Index --> App["app.js<br/>router (#lesson-id) · lesson renderer · quiz · settings · feedback · Web Audio"]
+    App -- "fetch" --> CJ[("course.json")]
+    App --> Demos["demos.js<br/>12 demos + test card"]
+    Demos --> Plot["plot.js<br/>SVG line chart + hover"]
+    Demos --> DSPjs["dsp.js<br/>pure maths (port of DSP.swift)"]
+    App --> LS[("localStorage<br/>spp.progress · spp.prefs")]
+    App -. "user clicks" .-> GH["GitHub new-issue page"]
+```
+
+| Component | Job |
+|---|---|
+| `index.html` / `styles.css` | Page structure and the visual system. Colour tokens are defined for light and dark (`prefers-color-scheme` plus the host's `data-theme`) and use the same blue/orange series pair and sequential blue ramp as the Mac app. Demos sit on a faint oscilloscope-graticule background. Below 860 px wide, the sidebar becomes a slide-in drawer. |
+| `app.js` | Loads `course.json` and routes on `location.hash` (a plain lesson id, which the host allows). It renders blocks, using a minimal inline-Markdown renderer that escapes HTML first. It runs the quiz with the same pass-mark rule as the Mac app, and handles progress, settings, the feedback dialog, keyboard shortcuts (⌘, and ⇧⌘F) and audio. Audio uses one `AudioContext`, created on the first click, playing 44.1 kHz buffers with 10 ms fades. |
+| `demos.js` | One `build(host, ctx)` function per demo. Each builds its controls with a tiny DOM kit and redraws on input. It returns a clean-up function when it holds listeners or an animation loop: the wheel's `requestAnimationFrame`, and the spectrogram's theme observers. |
+| `plot.js` | An SVG line chart: nice ticks, optional log x, dashed reference series, dots, a legend only for two or more series, and a hover crosshair with a tooltip. It redraws on resize through `ResizeObserver`, and its colours are CSS variables, so it follows the theme. |
+| `dsp.js` | A line-for-line port of the Swift maths. It uses an iterative radix-2 FFT instead of vDSP, and seeded mulberry32 noise instead of the Swift LCG, so noise samples differ between the versions while everything else is numerically equivalent. |
+
+**Website decisions and trade-offs**
+- **No framework and no build step.** The files are what gets published, so there's no bundler or toolchain to maintain. The cost is hand-rolled DOM code in `demos.js` and `app.js`.
+- **Per-browser storage for progress and settings.** Each learner's progress stays in their own browser with no accounts. Every read and write is wrapped in try/catch, so the page still works when storage is blocked. Progress doesn't follow a learner across devices.
+- **Your photo is kept for the tab only.** It isn't persisted to storage, which avoids size limits and keeps private photos out of storage.
+- **Feedback opens a pre-filled GitHub issue**, the same as the Mac app, plus a *Copy text* fallback for visitors who can't reach the private repo.
+- **Local preview needs a wrapper.** The page has no doctype or head of its own, because the host adds them. `scripts/serve_web.py` adds the same wrapper so local runs match production.
 
 ## Known limits
 
-- **Mac only for now.** The brief puts the website after the Mac app as its own step. It isn't built yet.
+- **Website:** progress isn't synced between browsers or with the Mac app. Visitors without repo access can't file GitHub issues. The heavy image demos run on the main thread, so the page pauses briefly on slow phones.
 - **Picture demos are grayscale only.** There's no colour, chroma-subsampling or gamma demo.
 - **Recomputation.** Audio demos recompute synchronously on every slider movement. They're fine at current sizes but would need debouncing for longer signals.
 - **No live input.** There is no microphone or camera input (you chose demos without it).

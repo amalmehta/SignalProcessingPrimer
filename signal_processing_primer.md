@@ -71,8 +71,13 @@ Decided without asking:
 - App is ad-hoc signed and unsandboxed for local use; not notarised.
 - Developer launch arguments (-initialLesson, -scrollToDemo, -showSettings,
   -showFeedback) were added to capture README screenshots without UI scripting.
-- The website (meta-instruction: "after, as its own step") is not built yet —
-  it's the next step to propose, not done here.
+- Website (built 2026-10-06, after asking): published as a private claude.ai
+  Artifact; plain HTML/CSS/JS in web/, no build step; lesson text moved into one
+  shared content/course.json read by both the Mac app and the website; feedback
+  tab opens a pre-filled GitHub issue (plus "Copy text" for people without repo
+  access). Decided without asking: web progress/settings live in each visitor's
+  browser (no sync with the Mac app); an uploaded photo is kept for the tab only;
+  the web DSP is a JS port verified by Node tests mirroring the Swift tests.
 
 CHANGELOG:
 
@@ -94,3 +99,4 @@ CHANGELOG:
 - 2026-10-02 — added meta-instruction: every project has a system design doc at docs/SYSTEM-DESIGN.md
 - 2026-10-05 — added meta-instruction: applications include a settings button or tab
 - 2026-10-06 — built v1.0 of the Mac app: 12 lessons, 12 demos, quizzes, progress, settings, feedback, tests, docs
+- 2026-10-06 — built the website (private Artifact) and moved lesson content into a shared course.json
