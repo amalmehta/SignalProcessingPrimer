@@ -27,8 +27,8 @@ private struct ReadingSettings: View {
             }
             Toggle("Explain answers after checking", isOn: $showExplanations)
             Picker("To complete a lesson", selection: $passMark) {
-                Text("2 of 3 correct").tag(2)
-                Text("3 of 3 correct").tag(3)
+                Text("All but one correct").tag(2)
+                Text("All correct").tag(3)
             }
         }
     }

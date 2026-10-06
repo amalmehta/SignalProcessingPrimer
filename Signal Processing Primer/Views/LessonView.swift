@@ -106,7 +106,8 @@ struct QuizView: View {
     @State private var submitted = false
 
     private var score: Int { zip(picks, lesson.quiz).filter { $0.0 == $0.1.answer }.count }
-    private var required: Int { min(passMark, lesson.quiz.count) }
+    /// passMark 3 = all correct; otherwise all but one (stored as 2 for compatibility with v1 settings).
+    private var required: Int { passMark >= 3 ? lesson.quiz.count : max(lesson.quiz.count - 1, 1) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {

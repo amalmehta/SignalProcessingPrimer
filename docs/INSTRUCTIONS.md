@@ -32,16 +32,16 @@ To keep it, drag `Signal Processing Primer.app` from `build/Build/Products/Relea
 xcodebuild -project "Signal Processing Primer.xcodeproj" -scheme "Signal Processing Primer" -derivedDataPath build test
 ```
 
-There are 26 tests. 16 check the DSP maths (FFT, aliasing, quantisation SNR, convolution, biquads, the compressor, the DCT/JPEG round trip, image kernels, spectrograms). 4 check colour and gamma (transfer functions, shadow codes, Y′CbCr, chroma subsampling). 6 check the course content, progress saving and the feedback file.
+There are 30 tests. 16 check the DSP maths (FFT, aliasing, quantisation SNR, convolution, biquads, the compressor, the DCT/JPEG round trip, image kernels, spectrograms). 4 check colour and gamma (transfer functions, shadow codes, Y′CbCr, chroma subsampling). 4 check white balance (light colour by temperature, camera presets, eyedropper, gray world). 6 check the course content, progress saving and the feedback file.
 
 ## Using the app
 
 - **Sidebar:** the 13 lessons in 4 modules. A green tick means you passed that lesson's quiz. The bar at the bottom shows your overall progress.
 - **Lesson page:** text, formulas and an *In practice* box on real-world audio, video and film uses. The **Try it** demo sits in the middle, and the quiz is at the end. **Next** goes to the following lesson.
 - **Demos:** move the sliders and the plots update straight away. Hover over a chart to read its values. **Play** buttons let you hear the result. Start with the volume low, because the aliasing and low-bit-depth demos are deliberately harsh.
-- **Quiz:** pick an answer for each question, then click **Check Answers**. Get enough right (2 of 3 by default) and the lesson is marked complete.
+- **Quiz:** pick an answer for each question, then click **Check Answers**. Get all but one right (the default; Settings can require all) and the lesson is marked complete.
 - **Settings** (⌘, or the gear in the toolbar):
-  - Reading: text size, answer explanations, pass mark
+  - Reading: text size, answer explanations, pass mark (all but one correct, or all correct)
   - Sound: demo volume, tone length, test sound
   - Images: use your own photo in the picture demos (grayscale in Lessons 10–11, colour in Lesson 13)
   - Progress: reset your progress

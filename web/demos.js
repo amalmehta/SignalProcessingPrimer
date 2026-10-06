@@ -484,14 +484,15 @@ function frameRate(host, ctx) {
 // ---------- Lesson 13: colour & gamma ----------
 function colourGamma(host, ctx) {
   const body = h('div', { class: 'demo-body' });
-  const tabs = h('div', { class: 'segmented two', role: 'radiogroup', 'aria-label': 'Part' });
+  const tabs = h('div', { class: 'segmented three', role: 'radiogroup', 'aria-label': 'Part' });
   let off = null;
   const show = part => {
     off?.(); off = null; body.replaceChildren();
-    off = part === 'gamma' ? gammaPart(body) : chromaPart(body, ctx);
+    off = part === 'gamma' ? gammaPart(body) : part === 'chroma' ? chromaPart(body, ctx) : whiteBalancePart(body, ctx);
   };
-  ['Gamma', 'Chroma subsampling'].forEach((label, i) => {
-    const id = `c${++uid}`, input = h('input', { type: 'radio', name: `part${uid}`, id, value: i ? 'chroma' : 'gamma' });
+  const group = `part${++uid}`;
+  [['gamma', 'Gamma'], ['chroma', 'Chroma subsampling'], ['wb', 'White balance']].forEach(([value, label], i) => {
+    const id = `c${++uid}`, input = h('input', { type: 'radio', name: group, id, value });
     if (!i) input.checked = true;
     input.addEventListener('change', () => show(input.value));
     tabs.append(h('label', { for: id }, input, h('span', {}, label)));
@@ -547,6 +548,50 @@ function chromaPart(host, ctx) {
   host.append(row(select('Subsampling', Object.keys(D.SUBSAMPLING), mode, v => { mode = v; draw(); }),
     select('Show', ['Result', 'Y′ (luma)', 'Cb (blue − luma)', 'Cr (red − luma)'], channel, v => { channel = v; draw(); }),
     toggle('Zoom 2× on centre', zoom, v => { zoom = v; draw(); })), ro, h('div', { class: 'images two' }, before, after));
+  draw();
+  return ctx.onImage(draw);
+}
+
+function whiteBalancePart(host, ctx) {
+  let scene = 'chart', lightK = 3200, cameraK = 5600, setting = 'kelvin', estimate = 0, gains = D.gainsForKelvin(5600), lit, token = 0;
+  const ro = readouts(), asLit = rgbCanvas('As lit, no correction (camera at 6,500 K)'), result = rgbCanvas('Camera result — click a gray area to balance on it');
+  const k = v => `${Math.round(v).toLocaleString()} K`;
+  const cam = slider('Camera white balance', { min: 2000, max: 10000, step: 50, value: cameraK, format: k }, v => { cameraK = v; setting = 'kelvin'; gains = D.gainsForKelvin(v); draw(); });
+  const light = slider('Scene light', { min: 2000, max: 10000, step: 50, value: lightK, format: k }, v => { lightK = v; draw(); });
+  const draw = async () => {
+    const my = ++token;
+    const src = scene === 'photo' && ctx.hasCustomImage() ? await ctx.getColourImage() : D.checkerChart();
+    await new Promise(r => setTimeout(r));
+    if (my !== token) return;
+    lit = D.captureUnder(src, lightK);
+    const out = D.correctWith(lit, gains);
+    asLit.draw(lit); result.draw(out);
+    const rows = [['Camera setting', setting === 'kelvin' ? k(cameraK) : `${setting === 'auto' ? 'Auto' : 'Picked'} ≈ ${k(estimate)}`],
+      ['Gains applied (R · G · B)', gains.map(g => `×${g.toFixed(2)}`).join(' · ')]];
+    if (scene === 'chart') {
+      const [px, py] = D.grayPatchCentre(out.width), i = py * out.width + px;
+      rows.push(['Gray patch reads (R G B)', [out.r[i], out.g[i], out.b[i]].map(v => Math.round(v * 255)).join(' ')]);
+    }
+    ro.set(rows);
+  };
+  const neutral = (c, how) => { gains = D.gainsForNeutral(c); estimate = D.estimateKelvin(c); setting = how; draw(); };
+  for (const fig of [asLit, result]) {
+    const canvas = fig.querySelector('canvas');
+    canvas.classList.add('pick');
+    canvas.addEventListener('click', e => {
+      if (!lit) return;
+      const r = canvas.getBoundingClientRect();
+      const x = Math.floor((e.clientX - r.left) / r.width * lit.width), y = Math.floor((e.clientY - r.top) / r.height * lit.height);
+      neutral(D.sampleLinear(lit, Math.min(Math.max(x, 0), lit.width - 1), Math.min(Math.max(y, 0), lit.height - 1)), 'picked');
+    });
+  }
+  const sceneSel = select('Scene', [['chart', 'Colour checker chart'], ['photo', 'Your photo (Settings → Images)']], scene, v => { scene = v; draw(); });
+  const presets = h('div', { class: 'presets-row' }, h('span', { class: 'note' }, 'Light:'),
+    [['Candle', 2000], ['Tungsten', 3200], ['Daylight', 5600], ['Overcast', 6500], ['Shade', 8000]].map(([name, v]) =>
+      h('button', { class: 'link', type: 'button', onclick: () => { lightK = v; light.set(v); draw(); } }, name)));
+  host.append(row(sceneSel, presets), row(light, cam,
+    h('button', { class: 'btn', type: 'button', onclick: () => lit && neutral(D.grayWorld(lit), 'auto') }, 'Auto (gray world)')),
+    ro, h('div', { class: 'images two' }, asLit, result));
   draw();
   return ctx.onImage(draw);
 }

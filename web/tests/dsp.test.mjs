@@ -132,3 +132,25 @@ test('Y′CbCr round trip; 4:2:0 keeps luma and loses chroma detail', () => {
   assert.deepEqual(Array.from(full.y), Array.from(quarter.y));
   assert.equal(D.samplesPerPixel('4:2:0'), 1.5); assert.equal(D.samplesPerPixel('4:2:2'), 2);
 });
+
+test('white balance: illuminant neutral at 6,500 K, warm below, cool above', () => {
+  const ref = D.illuminant(6500); near(ref[0], 1, 1e-9); near(ref[2], 1, 1e-9);
+  assert.ok(D.illuminant(3200)[0] > 1 && D.illuminant(3200)[2] < 0.6);
+  assert.ok(D.illuminant(9000)[0] < 1 && D.illuminant(9000)[2] > 1);
+});
+
+test('white balance: matching camera setting and eyedropper restore neutrals', () => {
+  const [px, py] = D.grayPatchCentre(), shot = D.captureUnder(D.checkerChart(), 3200);
+  const raw = D.sampleLinear(shot, px, py);
+  assert.ok(raw[0] > raw[2] * 1.5);
+  for (const gains of [D.gainsForKelvin(3200), D.gainsForNeutral(raw)]) {
+    const c = D.sampleLinear(D.correctWith(shot, gains), px, py);
+    near(c[0] / c[1], 1, 0.02); near(c[2] / c[1], 1, 0.02);
+  }
+  near(D.estimateKelvin(raw), 3200, 100);
+});
+
+test('white balance: gray world is exact on a colourless scene', () => {
+  const chart = D.checkerChart(), gray = { ...chart, g: chart.r, b: chart.r };
+  near(D.estimateKelvin(D.grayWorld(D.captureUnder(gray, 5000))), 5000, 100);
+});

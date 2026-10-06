@@ -67,7 +67,13 @@ Decided without asking:
   Lesson 13 (asked: new lesson; gamma + chroma subsampling). Decided without
   asking: BT.601 Y′CbCr weights (as JPEG), chroma averaged per block and
   replicated back, 4 transfer presets, and a colour test card built to expose
-  subsampling; white balance, gamuts and HDR curves stay in the text.
+  subsampling; gamuts and HDR curves stay in the text.
+- White balance (asked: third tab in Lesson 13; light + camera + auto + eyedropper).
+  Decided without asking: lights modelled as black bodies (Planckian locus, Kim
+  et al. fit), 6,500 K = neutral, per-channel gains relative to green in linear
+  light, simulated auto-exposure so white never clips, a colour-checker chart as
+  the default scene, one added quiz question, and the pass mark reworded to
+  "all but one correct" / "all correct" so it works for a 4-question quiz.
 - Progress = passing a lesson's quiz (default 2 of 3, adjustable to 3 of 3).
 - Settings: text size, explanations, pass mark, volume, tone length, demo image,
   reset progress.
@@ -104,3 +110,4 @@ CHANGELOG:
 - 2026-10-06 — built v1.0 of the Mac app: 12 lessons, 12 demos, quizzes, progress, settings, feedback, tests, docs
 - 2026-10-06 — built the website (private Artifact) and moved lesson content into a shared course.json
 - 2026-10-06 — added Lesson 13 "Colour, Gamma and Chroma" with a gamma + chroma subsampling demo (Mac app and website)
+- 2026-10-06 — added a white balance demo (third tab of Lesson 13) and a 4th quiz question; pass mark is now "all but one" or "all" correct

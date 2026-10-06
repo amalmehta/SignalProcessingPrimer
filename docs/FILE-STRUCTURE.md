@@ -22,7 +22,7 @@ signal_processing_primer/
 │   │   ├── DSP.swift                        1-D signal processing: tones, aliasing, quantization, FFT, windows,
 │   │   │                                    STFT, convolution, biquad filters, compressor
 │   │   ├── ImageDSP.swift                   2-D: test card, image kernels, 8×8 DCT, JPEG quantization, PSNR
-│   │   └── ColourDSP.swift                  Colour: transfer functions (gamma), Y′CbCr, chroma subsampling, colour test card
+│   │   └── ColourDSP.swift                  Colour: transfer functions (gamma), Y′CbCr, chroma subsampling, white balance, test charts
 │   ├── Audio/
 │   │   └── TonePlayer.swift                 Plays generated buffers through AVAudioEngine
 │   ├── Views/
@@ -52,7 +52,7 @@ signal_processing_primer/
 │   └── tests/dsp.test.mjs            Node tests: DSP maths + course.json integrity
 │
 ├── Tests/
-│   ├── DSPTests.swift                       Numerical checks of every DSP routine, including colour and gamma
+│   ├── DSPTests.swift                       Numerical checks of every DSP routine, including colour, gamma and white balance
 │   └── CourseTests.swift                    Content integrity, progress persistence, feedback file
 │
 ├── scripts/

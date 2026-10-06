@@ -237,16 +237,20 @@ struct RGBImageView: View {
 }
 
 struct ColourGammaDemo: View {
-    enum Part: String, CaseIterable, Identifiable { case gamma = "Gamma", chroma = "Chroma subsampling"; var id: String { rawValue } }
+    enum Part: String, CaseIterable, Identifiable {
+        case gamma = "Gamma", chroma = "Chroma subsampling", whiteBalance = "White balance"
+        var id: String { rawValue }
+    }
     @State private var part = Part.gamma
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Picker("Part", selection: $part) { ForEach(Part.allCases) { Text($0.rawValue).tag($0) } }
-                .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 360)
+                .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 480)
             switch part {
             case .gamma: GammaPart()
             case .chroma: ChromaPart()
+            case .whiteBalance: WhiteBalancePart()
             }
         }
     }
@@ -342,5 +346,117 @@ private struct ChromaPart: View {
                 return (ColourDSP.channelView(c, result: r.image, y: r.y, cb: r.cb, cr: r.cr), ColourDSP.psnr(input, r.image))
             }.value
         }
+    }
+}
+
+private struct WhiteBalancePart: View {
+    enum Scene: String, CaseIterable, Identifiable { case chart = "Colour checker chart", photo = "Your photo"; var id: String { rawValue } }
+    enum Setting: Equatable { case kelvin, auto(Double), picked(Double) }
+
+    @State private var scene = Scene.chart
+    @State private var lightK = 3200.0
+    @State private var cameraK = 5600.0
+    @State private var setting = Setting.kelvin
+    @State private var gains = WhiteBalance.gains(forKelvin: 5600)
+    @State private var shots: (asLit: RGBImage, result: RGBImage)?
+    @AppStorage(Prefs.customImagePath) private var imagePath = ""
+
+    private var source: RGBImage { scene == .photo && !imagePath.isEmpty ? DemoImage.currentColour() : WhiteBalance.checkerChart() }
+    private static let lights: [(String, Double)] = [("Candle", 2000), ("Tungsten", 3200), ("Daylight", 5600), ("Overcast", 6500), ("Shade", 8000)]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 24) {
+                Picker("Scene", selection: $scene) {
+                    ForEach(Scene.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .frame(width: 280)
+                .disabled(imagePath.isEmpty)
+                .help(imagePath.isEmpty ? "Choose a photo in Settings → Images to use it here" : "")
+                HStack(spacing: 6) {
+                    Text("Light:").font(.callout).foregroundStyle(.secondary)
+                    ForEach(Self.lights, id: \.1) { name, k in
+                        Button(name) { lightK = k }.buttonStyle(.link).font(.callout)
+                    }
+                }
+            }
+            HStack(spacing: 24) {
+                ParamSlider(title: "Scene light", value: $lightK, range: 2000...10000, step: 50, format: { kelvin($0) })
+                ParamSlider(title: "Camera white balance", value: Binding(get: { cameraK }, set: { cameraK = $0; setting = .kelvin }),
+                            range: 2000...10000, step: 50, format: { kelvin($0) })
+                Button("Auto (gray world)") { auto() }
+            }
+            HStack(spacing: 32) {
+                Readout(label: "Camera setting", value: settingText)
+                Readout(label: "Gains applied (R · G · B)", value: String(format: "×%.2f · ×%.2f · ×%.2f", gains.r, gains.g, gains.b))
+                if scene == .chart, let shots { Readout(label: "Gray patch reads (R G B)", value: grayPatch(shots.result)) }
+            }
+            HStack(alignment: .top, spacing: 16) {
+                if let shots {
+                    pickable(shots.asLit, label: "As lit, no correction (camera at 6,500 K)")
+                    pickable(shots.result, label: "Camera result — click a gray area to balance on it")
+                } else {
+                    ProgressView().frame(maxWidth: .infinity, minHeight: 200)
+                }
+            }
+            .frame(maxHeight: 300)
+        }
+        .onChange(of: cameraK) { _, k in if setting == .kelvin { gains = WhiteBalance.gains(forKelvin: k) } }
+        .task(id: "\(scene.rawValue)-\(lightK)-\(gains.r)-\(gains.b)-\(imagePath)") {
+            let src = source, light = lightK, g = gains
+            shots = await Task.detached(priority: .userInitiated) {
+                let lit = WhiteBalance.capture(src, lightKelvin: light)
+                return (lit, WhiteBalance.correct(lit, gains: g))
+            }.value
+        }
+    }
+
+    private var settingText: String {
+        switch setting {
+        case .kelvin: return kelvin(cameraK)
+        case .auto(let k): return "Auto ≈ \(kelvin(k))"
+        case .picked(let k): return "Picked ≈ \(kelvin(k))"
+        }
+    }
+
+    private func kelvin(_ k: Double) -> String { "\(Int(k).formatted()) K" }
+
+    private func auto() {
+        guard let lit = shots?.asLit else { return }
+        let light = WhiteBalance.grayWorld(lit)
+        gains = WhiteBalance.gains(neutral: light)
+        setting = .auto(WhiteBalance.estimateKelvin(light))
+    }
+
+    private func grayPatch(_ img: RGBImage) -> String {
+        let p = WhiteBalance.grayPatchCentre(width: img.width), i = p.y * img.width + p.x
+        return [img.r[i], img.g[i], img.b[i]].map { String(Int(($0 * 255).rounded())) }.joined(separator: " ")
+    }
+
+    /// An image you can click: the colour under the pointer (as lit) becomes the new white.
+    private func pickable(_ img: RGBImage, label: String) -> some View {
+        VStack(spacing: 4) {
+            if let cg = img.cgImage {
+                Image(decorative: cg, scale: 1).resizable().interpolation(.none).aspectRatio(contentMode: .fit)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .overlay {
+                        GeometryReader { geo in
+                            Color.clear.contentShape(Rectangle())
+                                .onTapGesture { loc in pick(at: loc, in: geo.size) }
+                        }
+                    }
+                    .onHover { inside in if inside { NSCursor.crosshair.push() } else { NSCursor.pop() } }
+                    .accessibilityLabel(label)
+            }
+            Text(label).font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    private func pick(at loc: CGPoint, in size: CGSize) {
+        guard let lit = shots?.asLit, size.width > 0, size.height > 0 else { return }
+        let x = Int(loc.x / size.width * CGFloat(lit.width)), y = Int(loc.y / size.height * CGFloat(lit.height))
+        let c = WhiteBalance.sample(lit, x: min(max(x, 0), lit.width - 1), y: min(max(y, 0), lit.height - 1))
+        gains = WhiteBalance.gains(neutral: c)
+        setting = .picked(WhiteBalance.estimateKelvin(c))
     }
 }

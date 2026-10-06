@@ -471,3 +471,93 @@ export function centreCropRGB(img) {
   }
   return out;
 }
+
+// ---------- White balance (Lesson 13) — all maths in linear light ----------
+
+export const WB_REFERENCE = 6500;   // renders neutral with unity gains
+
+/** CIE 1931 xy of a black body (Kim et al. cubic fit, 1667–25000 K). */
+export function planckianXY(kelvin) {
+  const t = Math.min(Math.max(kelvin, 1667), 25000), t2 = t * t, t3 = t2 * t;
+  const x = t <= 4000 ? -0.2661239e9 / t3 - 0.2343589e6 / t2 + 0.8776956e3 / t + 0.179910
+                      : -3.0258469e9 / t3 + 2.1070379e6 / t2 + 0.2226347e3 / t + 0.240390;
+  const x2 = x * x, x3 = x2 * x;
+  const y = t <= 2222 ? -1.1063814 * x3 - 1.34811020 * x2 + 2.18555832 * x - 0.20219683
+          : t <= 4000 ? -0.9549476 * x3 - 1.37418593 * x2 + 2.09137015 * x - 0.16748867
+          : 3.0817580 * x3 - 5.87338670 * x2 + 3.75112997 * x - 0.37001483;
+  return [x, y];
+}
+
+/** Linear-sRGB colour of light at `kelvin`, scaled so 6,500 K is [1, 1, 1] and green is 1. */
+export function illuminant(kelvin) {
+  const raw = k => {
+    const [x, y] = planckianXY(k), X = x / y, Z = (1 - x - y) / y;
+    return [Math.max(3.2406 * X - 1.5372 - 0.4986 * Z, 0.001), Math.max(-0.9689 * X + 1.8758 + 0.0415 * Z, 0.001), Math.max(0.0557 * X - 0.2040 + 1.0570 * Z, 0.001)];
+  };
+  const c = raw(kelvin), ref = raw(WB_REFERENCE), r = c[0] / ref[0], g = c[1] / ref[1], b = c[2] / ref[2];
+  return [r / g, 1, b / g];
+}
+
+export function gainsForKelvin(kelvin) { const l = illuminant(kelvin); return [1 / l[0], 1, 1 / l[2]]; }
+export function gainsForNeutral([r, g, b]) { return [g / Math.max(r, 1e-6), 1, g / Math.max(b, 1e-6)]; }
+
+export function estimateKelvin([r, g, b]) {
+  const tr = Math.log(r / Math.max(g, 1e-9)), tb = Math.log(b / Math.max(g, 1e-9));
+  let best = WB_REFERENCE, err = Infinity;
+  for (let k = 2000; k <= 10000; k += 25) {
+    const l = illuminant(k), e = (Math.log(l[0]) - tr) ** 2 + (Math.log(l[2]) - tb) ** 2;
+    if (e < err) { err = e; best = k; }
+  }
+  return best;
+}
+
+function applyGains(img, [gr, gg, gb]) {
+  const n = img.r.length, out = { width: img.width, height: img.height, r: new Float32Array(n), g: new Float32Array(n), b: new Float32Array(n) };
+  const enc = v => encodeTransfer('sRGB', v), dec = v => decodeTransfer('sRGB', v);
+  for (let i = 0; i < n; i++) { out.r[i] = enc(dec(img.r[i]) * gr); out.g[i] = enc(dec(img.g[i]) * gg); out.b[i] = enc(dec(img.b[i]) * gb); }
+  return out;
+}
+/** The scene as the sensor records it under light at `kelvin`. Images are sRGB-encoded R′G′B′. */
+// Exposure is set so the light's strongest channel is 1 (like auto-exposure), so white never clips.
+export const captureUnder = (img, kelvin) => { const l = illuminant(kelvin), m = Math.max(...l); return applyGains(img, l.map(v => v / m)); };
+export const correctWith = (captured, gains) => applyGains(captured, gains);
+
+/** Gray world: the scene's average linear colour, assumed to be the light. */
+export function grayWorld(img) {
+  const s = [0, 0, 0];
+  for (let i = 0; i < img.r.length; i++) {
+    s[0] += decodeTransfer('sRGB', img.r[i]); s[1] += decodeTransfer('sRGB', img.g[i]); s[2] += decodeTransfer('sRGB', img.b[i]);
+  }
+  return s;
+}
+
+/** Mean linear colour in a (2·radius+1)² square: the eyedropper. */
+export function sampleLinear(img, x, y, radius = 2) {
+  const s = [0, 0, 0];
+  for (let yy = Math.max(y - radius, 0); yy <= Math.min(y + radius, img.height - 1); yy++) {
+    for (let xx = Math.max(x - radius, 0); xx <= Math.min(x + radius, img.width - 1); xx++) {
+      const i = yy * img.width + xx;
+      s[0] += decodeTransfer('sRGB', img.r[i]); s[1] += decodeTransfer('sRGB', img.g[i]); s[2] += decodeTransfer('sRGB', img.b[i]);
+    }
+  }
+  return s;
+}
+
+const CHECKER = [0x735244, 0xC29682, 0x627A9D, 0x576C43, 0x8580B1, 0x67BDAA, 0xD67E2C, 0x505BA6, 0xC15A63, 0x5E3C6C, 0x9DBC40, 0xE0A32E,
+  0x383D96, 0x469449, 0xAF363C, 0xE7C71F, 0xBB5695, 0x0885A1, 0xF3F3F2, 0xC8C8C8, 0xA0A0A0, 0x7A7A79, 0x555555, 0x343434];
+
+/** 6×4 colour-checker chart (published sRGB approximations), bottom row neutral. */
+export function checkerChart(width = 360) {
+  const cell = Math.floor(width / 6), gap = Math.max(Math.floor(cell / 12), 2), height = cell * 4, n = width * height;
+  const img = { width, height, r: new Float32Array(n).fill(0.1), g: new Float32Array(n).fill(0.1), b: new Float32Array(n).fill(0.1) };
+  CHECKER.forEach((v, k) => {
+    const cx = (k % 6) * cell, cy = Math.floor(k / 6) * cell;
+    for (let y = cy + gap; y < cy + cell - gap; y++) for (let x = cx + gap; x < Math.min(cx + cell - gap, width); x++) {
+      const i = y * width + x; img.r[i] = ((v >> 16) & 255) / 255; img.g[i] = ((v >> 8) & 255) / 255; img.b[i] = (v & 255) / 255;
+    }
+  });
+  return img;
+}
+
+/** Centre of the "neutral 6.5" patch (bottom row, third from left). */
+export function grayPatchCentre(width = 360) { const cell = Math.floor(width / 6); return [2 * cell + (cell >> 1), 3 * cell + (cell >> 1)]; }

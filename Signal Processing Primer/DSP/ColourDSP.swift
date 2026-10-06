@@ -225,3 +225,136 @@ extension RGBImage {
         return out
     }
 }
+
+// MARK: - White balance
+
+/// Light colour vs. temperature, camera gains, and automatic estimates. All maths is in linear light.
+enum WhiteBalance {
+    struct RGB: Equatable { var r: Double, g: Double, b: Double }
+
+    static let reference = 6500.0     // the temperature that renders neutral with unity gains
+
+    /// CIE 1931 xy of a black body at `kelvin` (Kim et al. cubic fit to the Planckian locus, 1667–25000 K).
+    static func planckianXY(_ kelvin: Double) -> (x: Double, y: Double) {
+        let t = min(max(kelvin, 1667), 25000), t2 = t * t, t3 = t2 * t
+        let x = t <= 4000
+            ? -0.2661239e9 / t3 - 0.2343589e6 / t2 + 0.8776956e3 / t + 0.179910
+            : -3.0258469e9 / t3 + 2.1070379e6 / t2 + 0.2226347e3 / t + 0.240390
+        let x2 = x * x, x3 = x2 * x
+        let y: Double
+        if t <= 2222 { y = -1.1063814 * x3 - 1.34811020 * x2 + 2.18555832 * x - 0.20219683 }
+        else if t <= 4000 { y = -0.9549476 * x3 - 1.37418593 * x2 + 2.09137015 * x - 0.16748867 }
+        else { y = 3.0817580 * x3 - 5.87338670 * x2 + 3.75112997 * x - 0.37001483 }
+        return (x, y)
+    }
+
+    /// Linear-sRGB colour of the light at `kelvin`, scaled so 6,500 K is (1, 1, 1) and green is always 1.
+    static func illuminant(_ kelvin: Double) -> RGB {
+        func raw(_ k: Double) -> RGB {
+            let (x, y) = planckianXY(k)
+            let X = x / y, Z = (1 - x - y) / y          // Y = 1
+            return RGB(r: max(3.2406 * X - 1.5372 - 0.4986 * Z, 0.001),
+                       g: max(-0.9689 * X + 1.8758 + 0.0415 * Z, 0.001),
+                       b: max(0.0557 * X - 0.2040 + 1.0570 * Z, 0.001))
+        }
+        let c = raw(kelvin), ref = raw(reference)
+        let r = c.r / ref.r, g = c.g / ref.g, b = c.b / ref.b
+        return RGB(r: r / g, g: 1, b: b / g)
+    }
+
+    /// Camera white-balance gains for an assumed light: divide it out, keeping green at 1 (as cameras do).
+    static func gains(forKelvin kelvin: Double) -> RGB {
+        let l = illuminant(kelvin)
+        return RGB(r: 1 / l.r, g: 1, b: 1 / l.b)
+    }
+
+    /// Gains that make a measured colour neutral.
+    static func gains(neutral c: RGB) -> RGB {
+        RGB(r: c.g / max(c.r, 1e-6), g: 1, b: c.g / max(c.b, 1e-6))
+    }
+
+    /// Nearest temperature on the locus to a measured light colour (by log chromaticity ratios).
+    static func estimateKelvin(_ c: RGB) -> Double {
+        let tr = log(c.r / max(c.g, 1e-9)), tb = log(c.b / max(c.g, 1e-9))
+        var best = reference, bestErr = Double.infinity
+        for k in stride(from: 2000.0, through: 10000, by: 25) {
+            let l = illuminant(k), e = pow(log(l.r) - tr, 2) + pow(log(l.b) - tb, 2)
+            if e < bestErr { bestErr = e; best = k }
+        }
+        return best
+    }
+
+    /// The scene as the sensor records it: linear reflectance × light. Input and output are R′G′B′ (sRGB-encoded).
+    /// Exposure is set so the light's strongest channel is 1 (like auto-exposure), so white never clips.
+    static func capture(_ img: RGBImage, lightKelvin: Double) -> RGBImage {
+        let l = illuminant(lightKelvin), m = max(l.r, l.g, l.b)
+        return apply(img, multiply: RGB(r: l.r / m, g: l.g / m, b: l.b / m))
+    }
+
+    /// Applies camera gains in linear light, then re-encodes (values above 1 clip, as on a real camera).
+    static func correct(_ captured: RGBImage, gains: RGB) -> RGBImage {
+        apply(captured, multiply: gains)
+    }
+
+    /// Gray-world estimate: the average colour of the scene is assumed to be neutral.
+    static func grayWorld(_ captured: RGBImage) -> RGB {
+        var s = RGB(r: 0, g: 0, b: 0)
+        let t = ColourDSP.Transfer.sRGB
+        for i in captured.r.indices {
+            s.r += t.decode(Double(captured.r[i])); s.g += t.decode(Double(captured.g[i])); s.b += t.decode(Double(captured.b[i]))
+        }
+        return s
+    }
+
+    /// Mean linear colour of a small square around (x, y): the eyedropper.
+    static func sample(_ img: RGBImage, x: Int, y: Int, radius: Int = 2) -> RGB {
+        var s = RGB(r: 0, g: 0, b: 0)
+        let t = ColourDSP.Transfer.sRGB
+        for yy in max(y - radius, 0)...min(y + radius, img.height - 1) {
+            for xx in max(x - radius, 0)...min(x + radius, img.width - 1) {
+                let i = yy * img.width + xx
+                s.r += t.decode(Double(img.r[i])); s.g += t.decode(Double(img.g[i])); s.b += t.decode(Double(img.b[i]))
+            }
+        }
+        return s
+    }
+
+    private static func apply(_ img: RGBImage, multiply m: RGB) -> RGBImage {
+        let t = ColourDSP.Transfer.sRGB
+        var out = img
+        for i in img.r.indices {
+            out.r[i] = Float(t.encode(t.decode(Double(img.r[i])) * m.r))
+            out.g[i] = Float(t.encode(t.decode(Double(img.g[i])) * m.g))
+            out.b[i] = Float(t.encode(t.decode(Double(img.b[i])) * m.b))
+        }
+        return out
+    }
+
+    /// A 6×4 colour-checker chart (published sRGB approximations of the standard patches), bottom row neutral.
+    static func checkerChart(width: Int = 360) -> RGBImage {
+        let hex: [UInt32] = [
+            0x735244, 0xC29682, 0x627A9D, 0x576C43, 0x8580B1, 0x67BDAA,
+            0xD67E2C, 0x505BA6, 0xC15A63, 0x5E3C6C, 0x9DBC40, 0xE0A32E,
+            0x383D96, 0x469449, 0xAF363C, 0xE7C71F, 0xBB5695, 0x0885A1,
+            0xF3F3F2, 0xC8C8C8, 0xA0A0A0, 0x7A7A79, 0x555555, 0x343434]
+        let cell = width / 6, gap = max(cell / 12, 2), height = cell * 4
+        let n = width * height
+        var img = RGBImage(width: width, height: height,
+                           r: [Float](repeating: 0.1, count: n), g: [Float](repeating: 0.1, count: n), b: [Float](repeating: 0.1, count: n))
+        for (k, v) in hex.enumerated() {
+            let cx = (k % 6) * cell, cy = (k / 6) * cell
+            let r = Float((v >> 16) & 0xFF) / 255, g = Float((v >> 8) & 0xFF) / 255, b = Float(v & 0xFF) / 255
+            for y in (cy + gap)..<(cy + cell - gap) { for x in (cx + gap)..<min(cx + cell - gap, width) {
+                let i = y * width + x
+                img.r[i] = r; img.g[i] = g; img.b[i] = b
+            } }
+        }
+        return img
+    }
+
+    /// Centre of the "neutral 6.5" patch (bottom row, third from left) — handy for tests and the readout.
+    static func grayPatchCentre(width: Int = 360) -> (x: Int, y: Int) {
+        let cell = width / 6
+        return (2 * cell + cell / 2, 3 * cell + cell / 2)
+    }
+}

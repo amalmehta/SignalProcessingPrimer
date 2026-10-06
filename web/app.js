@@ -42,6 +42,7 @@ const demoCtx = {
   toneCount: () => Math.round(FS * prefs.toneSeconds),
   getImage: async () => customImage || (cardCache ??= testCard()),
   getColourImage: async () => customColour || (colourCardCache ??= colourCard()),
+  hasCustomImage: () => !!customColour,
   onImage(fn) { imageListeners.add(fn); return () => imageListeners.delete(fn); },
 };
 
@@ -133,7 +134,7 @@ function renderLesson(l) {
 function renderQuiz(l, root) {
   const picks = Array(l.quiz.length).fill(null);
   let submitted = false;
-  const required = Math.min(prefs.passMark, l.quiz.length);
+  const required = prefs.passMark >= 3 ? l.quiz.length : Math.max(l.quiz.length - 1, 1);   // 2 = all but one, 3 = all
   const draw = () => {
     const score = picks.filter((p, i) => p === l.quiz[i].answer).length;
     const done = progress.completed.includes(l.id);

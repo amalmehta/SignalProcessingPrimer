@@ -161,3 +161,41 @@ final class ColourTests: XCTestCase {
         XCTAssertEqual(ColourDSP.Subsampling.s422.samplesPerPixel, 2)
     }
 }
+
+final class WhiteBalanceTests: XCTestCase {
+    func testIlluminantIsNeutralAtReferenceAndWarmerWhenLower() {
+        let ref = WhiteBalance.illuminant(6500)
+        XCTAssertEqual(ref.r, 1, accuracy: 1e-9); XCTAssertEqual(ref.b, 1, accuracy: 1e-9)
+        let tungsten = WhiteBalance.illuminant(3200), shade = WhiteBalance.illuminant(9000)
+        XCTAssertGreaterThan(tungsten.r, 1); XCTAssertLessThan(tungsten.b, 0.6)
+        XCTAssertLessThan(shade.r, 1); XCTAssertGreaterThan(shade.b, 1)
+    }
+
+    func testMatchingCameraSettingRestoresNeutrals() {
+        let chart = WhiteBalance.checkerChart()
+        let shot = WhiteBalance.capture(chart, lightKelvin: 3200)
+        let p = WhiteBalance.grayPatchCentre()
+        let raw = WhiteBalance.sample(shot, x: p.x, y: p.y)
+        XCTAssertGreaterThan(raw.r, raw.b * 1.5, "tungsten light makes the gray patch orange")
+        let fixed = WhiteBalance.correct(shot, gains: WhiteBalance.gains(forKelvin: 3200))
+        let c = WhiteBalance.sample(fixed, x: p.x, y: p.y)
+        XCTAssertEqual(c.r / c.g, 1, accuracy: 0.02); XCTAssertEqual(c.b / c.g, 1, accuracy: 0.02)
+    }
+
+    func testEyedropperAndEstimateRecoverTheLight() {
+        let shot = WhiteBalance.capture(WhiteBalance.checkerChart(), lightKelvin: 4000)
+        let p = WhiteBalance.grayPatchCentre()
+        let picked = WhiteBalance.sample(shot, x: p.x, y: p.y)
+        XCTAssertEqual(WhiteBalance.estimateKelvin(picked), 4000, accuracy: 100)
+        let fixed = WhiteBalance.correct(shot, gains: WhiteBalance.gains(neutral: picked))
+        let c = WhiteBalance.sample(fixed, x: p.x, y: p.y)
+        XCTAssertEqual(c.r / c.g, 1, accuracy: 0.02); XCTAssertEqual(c.b / c.g, 1, accuracy: 0.02)
+    }
+
+    func testGrayWorldOnANeutralSceneIsExact() {
+        var gray = WhiteBalance.checkerChart()
+        gray.g = gray.r; gray.b = gray.r          // a scene with no colour at all
+        let est = WhiteBalance.estimateKelvin(WhiteBalance.grayWorld(WhiteBalance.capture(gray, lightKelvin: 5000)))
+        XCTAssertEqual(est, 5000, accuracy: 100)
+    }
+}

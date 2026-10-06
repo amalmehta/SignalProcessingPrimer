@@ -942,9 +942,9 @@
         {
           "id": "colour",
           "title": "Colour, Gamma and Chroma",
-          "summary": "Why pixel values aren't light, and why colour can be stored at lower resolution than brightness.",
+          "summary": "Why pixel values aren't light, how cameras neutralise the colour of the light, and why colour can be stored at lower resolution than brightness.",
           "demo": "colourGamma",
-          "demoCaption": "Gamma: lower the bit depth and compare where linear storage bands. Chroma: subsample the colour, then look at the red text on blue and the fine coloured stripes.",
+          "demoCaption": "Three parts. Gamma: lower the bit depth and compare where linear storage bands. Chroma: subsample the colour and look at the red text on blue. White balance: light the chart with tungsten, then fix it with the camera setting, Auto, or a click on a gray patch.",
           "blocks": [
             {
               "type": "text",
@@ -992,9 +992,34 @@
               ]
             },
             {
+              "type": "heading",
+              "text": "White balance"
+            },
+            {
+              "type": "text",
+              "text": "Light itself has a colour. A candle or tungsten bulb is orange (2,000–3,200 K), noon daylight is near neutral (about 5,600 K) and open shade is blue (7,000 K and above). The numbers are **colour temperatures**: the temperature of a glowing black body that emits light of that colour."
+            },
+            {
+              "type": "text",
+              "text": "A sensor just records reflectance × light, so a white shirt under tungsten records as orange. Our brains discount the light automatically; cameras do it with **white balance**: one gain per channel, applied in linear light, chosen so a neutral object comes out with R = G = B."
+            },
+            {
+              "type": "equation",
+              "text": "R_out = R_in · g_R     G_out = G_in · 1     B_out = B_in · g_B",
+              "caption": "Gains are relative to green. Setting the camera to the light's temperature picks gains that cancel it."
+            },
+            {
+              "type": "bullets",
+              "items": [
+                "**Presets** (tungsten, daylight, shade) set the gains for a known light.",
+                "**Auto white balance** guesses the light from the image. The simplest method, *gray world*, assumes the scene averages to gray, which fails when one colour dominates (a sunset, a green forest).",
+                "**Custom white balance**: shoot or click a known neutral, like a gray card, and use its colour as the light."
+              ]
+            },
+            {
               "type": "inPractice",
               "title": "Grading, keying and delivery",
-              "body": "Colourists do maths like exposure and blending in **linear light**, where it's physically correct, then encode for the display. Camera **log** curves (S-Log, LogC, V-Log) are extreme transfer functions that fit 14+ stops of dynamic range into 10 bits. Green-screen keys pull far cleaner edges from 4:4:4 or 4:2:2 footage than 4:2:0, because the edge lives in the chroma. Designers avoid thin, saturated red text over blue in delivered video, because 4:2:0 smears it. HDR replaces gamma with the PQ (SMPTE ST 2084) and HLG transfer functions."
+              "body": "Camera crews white-balance on a **gray card** at the start of each setup, and mixed lighting (a tungsten lamp in a daylit room) is corrected with gels on the lights because one white balance can't fix both. Colourists do maths like exposure and blending in **linear light**, where it's physically correct, then encode for the display. Camera **log** curves (S-Log, LogC, V-Log) are extreme transfer functions that fit 14+ stops of dynamic range into 10 bits. Green-screen keys pull far cleaner edges from 4:4:4 or 4:2:2 footage than 4:2:0, because the edge lives in the chroma. Designers avoid thin, saturated red text over blue in delivered video, because 4:2:0 smears it. HDR replaces gamma with the PQ (SMPTE ST 2084) and HLG transfer functions."
             }
           ],
           "quiz": [
@@ -1030,6 +1055,17 @@
               ],
               "answer": 0,
               "explanation": "Our visual system resolves luminance detail much better than chrominance detail, so halving chroma resolution is hard to see in most images."
+            },
+            {
+              "prompt": "A scene lit by tungsten bulbs (3,200 K) is shot with the camera set to daylight (5,600 K). How does it look?",
+              "choices": [
+                "Too blue",
+                "Too orange",
+                "Correct",
+                "Black and white"
+              ],
+              "answer": 1,
+              "explanation": "The daylight setting doesn't cancel the extra red of tungsten light, so everything comes out orange. Setting the camera to 3,200 K fixes it."
             }
           ]
         }
