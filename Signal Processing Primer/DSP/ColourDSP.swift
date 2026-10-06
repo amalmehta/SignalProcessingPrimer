@@ -248,23 +248,45 @@ enum WhiteBalance {
         return (x, y)
     }
 
-    /// Linear-sRGB colour of the light at `kelvin`, scaled so 6,500 K is (1, 1, 1) and green is always 1.
-    static func illuminant(_ kelvin: Double) -> RGB {
-        func raw(_ k: Double) -> RGB {
-            let (x, y) = planckianXY(k)
-            let X = x / y, Z = (1 - x - y) / y          // Y = 1
-            return RGB(r: max(3.2406 * X - 1.5372 - 0.4986 * Z, 0.001),
-                       g: max(-0.9689 * X + 1.8758 + 0.0415 * Z, 0.001),
-                       b: max(0.0557 * X - 0.2040 + 1.0570 * Z, 0.001))
+    /// Tint (−100 green … +100 magenta, as in Lightroom/Premiere) → distance from the locus in CIE 1960 uv.
+    /// +100 is Duv −0.02 (below the locus, magenta); −100 is Duv +0.02 (above, green).
+    static func duv(tint: Double) -> Double { -tint / 100 * 0.02 }
+
+    /// xy of light at `kelvin`, moved off the Planckian locus along its normal by the tint.
+    static func lightXY(_ kelvin: Double, tint: Double) -> (x: Double, y: Double) {
+        func uv(_ k: Double) -> (u: Double, v: Double) {
+            let (x, y) = planckianXY(k), d = -2 * x + 12 * y + 3
+            return (4 * x / d, 6 * y / d)
         }
-        let c = raw(kelvin), ref = raw(reference)
+        let p = uv(kelvin)
+        guard tint != 0 else { return planckianXY(kelvin) }
+        let a = uv(kelvin - 10), b = uv(kelvin + 10)
+        var nu = -(b.v - a.v), nv = b.u - a.u                 // normal to the locus
+        let len = (nu * nu + nv * nv).squareRoot()
+        nu /= len; nv /= len
+        if nv < 0 { nu = -nu; nv = -nv }                      // positive Duv points towards green (higher v)
+        let d = duv(tint: tint), u = p.u + d * nu, v = p.v + d * nv, den = 2 * u - 8 * v + 4
+        return (3 * u / den, 2 * v / den)
+    }
+
+    private static func rawRGB(_ xy: (x: Double, y: Double)) -> RGB {
+        let X = xy.x / xy.y, Z = (1 - xy.x - xy.y) / xy.y          // Y = 1
+        return RGB(r: max(3.2406 * X - 1.5372 - 0.4986 * Z, 0.001),
+                   g: max(-0.9689 * X + 1.8758 + 0.0415 * Z, 0.001),
+                   b: max(0.0557 * X - 0.2040 + 1.0570 * Z, 0.001))
+    }
+    private static let referenceRGB = rawRGB(planckianXY(reference))
+
+    /// Linear-sRGB colour of the light at `kelvin` and `tint`, scaled so 6,500 K / tint 0 is (1, 1, 1) and green is 1.
+    static func illuminant(_ kelvin: Double, tint: Double = 0) -> RGB {
+        let c = rawRGB(lightXY(kelvin, tint: tint)), ref = referenceRGB
         let r = c.r / ref.r, g = c.g / ref.g, b = c.b / ref.b
         return RGB(r: r / g, g: 1, b: b / g)
     }
 
     /// Camera white-balance gains for an assumed light: divide it out, keeping green at 1 (as cameras do).
-    static func gains(forKelvin kelvin: Double) -> RGB {
-        let l = illuminant(kelvin)
+    static func gains(forKelvin kelvin: Double, tint: Double = 0) -> RGB {
+        let l = illuminant(kelvin, tint: tint)
         return RGB(r: 1 / l.r, g: 1, b: 1 / l.b)
     }
 
@@ -273,21 +295,30 @@ enum WhiteBalance {
         RGB(r: c.g / max(c.r, 1e-6), g: 1, b: c.g / max(c.b, 1e-6))
     }
 
-    /// Nearest temperature on the locus to a measured light colour (by log chromaticity ratios).
-    static func estimateKelvin(_ c: RGB) -> Double {
+    /// Nearest temperature and tint to a measured light colour (grid search on log chromaticity ratios).
+    static func estimate(_ c: RGB) -> (kelvin: Double, tint: Double) {
         let tr = log(c.r / max(c.g, 1e-9)), tb = log(c.b / max(c.g, 1e-9))
-        var best = reference, bestErr = Double.infinity
-        for k in stride(from: 2000.0, through: 10000, by: 25) {
-            let l = illuminant(k), e = pow(log(l.r) - tr, 2) + pow(log(l.b) - tb, 2)
-            if e < bestErr { bestErr = e; best = k }
+        func err(_ k: Double, _ t: Double) -> Double {
+            let l = illuminant(k, tint: t)
+            return pow(log(l.r) - tr, 2) + pow(log(l.b) - tb, 2)
+        }
+        var best = (kelvin: reference, tint: 0.0), bestErr = Double.infinity
+        for k in stride(from: 2000.0, through: 10000, by: 100) {
+            for t in stride(from: -100.0, through: 100, by: 5) where err(k, t) < bestErr { bestErr = err(k, t); best = (k, t) }
+        }
+        // Refine around the coarse best.
+        for k in stride(from: best.kelvin - 100, through: best.kelvin + 100, by: 10) {
+            for t in stride(from: best.tint - 5, through: best.tint + 5, by: 1) where err(k, t) < bestErr { bestErr = err(k, t); best = (k, t) }
         }
         return best
     }
 
+    static func estimateKelvin(_ c: RGB) -> Double { estimate(c).kelvin }
+
     /// The scene as the sensor records it: linear reflectance × light. Input and output are R′G′B′ (sRGB-encoded).
     /// Exposure is set so the light's strongest channel is 1 (like auto-exposure), so white never clips.
-    static func capture(_ img: RGBImage, lightKelvin: Double) -> RGBImage {
-        let l = illuminant(lightKelvin), m = max(l.r, l.g, l.b)
+    static func capture(_ img: RGBImage, lightKelvin: Double, tint: Double = 0) -> RGBImage {
+        let l = illuminant(lightKelvin, tint: tint), m = max(l.r, l.g, l.b)
         return apply(img, multiply: RGB(r: l.r / m, g: l.g / m, b: l.b / m))
     }
 

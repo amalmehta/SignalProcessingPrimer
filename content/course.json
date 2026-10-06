@@ -944,7 +944,7 @@
           "title": "Colour, Gamma and Chroma",
           "summary": "Why pixel values aren't light, how cameras neutralise the colour of the light, and why colour can be stored at lower resolution than brightness.",
           "demo": "colourGamma",
-          "demoCaption": "Three parts. Gamma: lower the bit depth and compare where linear storage bands. Chroma: subsample the colour and look at the red text on blue. White balance: light the chart with tungsten, then fix it with the camera setting, Auto, or a click on a gray patch.",
+          "demoCaption": "Three parts. Gamma: lower the bit depth and compare where linear storage bands. Chroma: subsample the colour and look at the red text on blue. White balance: light the chart with tungsten or fluorescent, then fix it with the camera's temperature and tint, Auto, or a click on a gray patch.",
           "blocks": [
             {
               "type": "text",
@@ -1013,7 +1013,8 @@
               "items": [
                 "**Presets** (tungsten, daylight, shade) set the gains for a known light.",
                 "**Auto white balance** guesses the light from the image. The simplest method, *gray world*, assumes the scene averages to gray, which fails when one colour dominates (a sunset, a green forest).",
-                "**Custom white balance**: shoot or click a known neutral, like a gray card, and use its colour as the light."
+                "**Custom white balance**: shoot or click a known neutral, like a gray card, and use its colour as the light.",
+                "**Tint** fixes the other axis. Fluorescent tubes and many LEDs aren't black bodies: they sit above the colour-temperature curve and look **green**. Cameras and grading tools therefore pair temperature with a green–magenta tint control."
               ]
             },
             {

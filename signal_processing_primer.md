@@ -74,6 +74,9 @@ Decided without asking:
   light, simulated auto-exposure so white never clips, a colour-checker chart as
   the default scene, one added quiz question, and the pass mark reworded to
   "all but one correct" / "all correct" so it works for a 4-question quiz.
+- Tint (asked for as "the tint slider"; decided without asking): two sliders, light tint
+  and camera tint, so there is something to correct; Lightroom convention (−green,
+  +magenta), ±100 = Duv ∓0.02; Fluorescent preset at 4,000 K / −25.
 - Progress = passing a lesson's quiz (default 2 of 3, adjustable to 3 of 3).
 - Settings: text size, explanations, pass mark, volume, tone length, demo image,
   reset progress.
@@ -111,3 +114,4 @@ CHANGELOG:
 - 2026-10-06 — built the website (private Artifact) and moved lesson content into a shared course.json
 - 2026-10-06 — added Lesson 13 "Colour, Gamma and Chroma" with a gamma + chroma subsampling demo (Mac app and website)
 - 2026-10-06 — added a white balance demo (third tab of Lesson 13) and a 4th quiz question; pass mark is now "all but one" or "all" correct
+- 2026-10-06 — added green–magenta tint to the white balance demo (light tint, camera tint, Fluorescent preset; Auto and eyedropper estimate tint too)

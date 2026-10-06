@@ -488,28 +488,49 @@ export function planckianXY(kelvin) {
   return [x, y];
 }
 
-/** Linear-sRGB colour of light at `kelvin`, scaled so 6,500 K is [1, 1, 1] and green is 1. */
-export function illuminant(kelvin) {
-  const raw = k => {
-    const [x, y] = planckianXY(k), X = x / y, Z = (1 - x - y) / y;
-    return [Math.max(3.2406 * X - 1.5372 - 0.4986 * Z, 0.001), Math.max(-0.9689 * X + 1.8758 + 0.0415 * Z, 0.001), Math.max(0.0557 * X - 0.2040 + 1.0570 * Z, 0.001)];
-  };
-  const c = raw(kelvin), ref = raw(WB_REFERENCE), r = c[0] / ref[0], g = c[1] / ref[1], b = c[2] / ref[2];
+/** Tint (−100 green … +100 magenta, as in Lightroom/Premiere) → Duv: +100 is −0.02 (magenta), −100 is +0.02 (green). */
+export const duv = tint => -tint / 100 * 0.02;
+
+/** xy of light at `kelvin`, moved off the Planckian locus along its normal (in CIE 1960 uv) by the tint. */
+export function lightXY(kelvin, tint = 0) {
+  if (!tint) return planckianXY(kelvin);
+  const uv = k => { const [x, y] = planckianXY(k), d = -2 * x + 12 * y + 3; return [4 * x / d, 6 * y / d]; };
+  const p = uv(kelvin), a = uv(kelvin - 10), b = uv(kelvin + 10);
+  let nu = -(b[1] - a[1]), nv = b[0] - a[0];
+  const len = Math.hypot(nu, nv); nu /= len; nv /= len;
+  if (nv < 0) { nu = -nu; nv = -nv; }                 // positive Duv points towards green
+  const d = duv(tint), u = p[0] + d * nu, v = p[1] + d * nv, den = 2 * u - 8 * v + 4;
+  return [3 * u / den, 2 * v / den];
+}
+
+function rawRGB([x, y]) {
+  const X = x / y, Z = (1 - x - y) / y;
+  return [Math.max(3.2406 * X - 1.5372 - 0.4986 * Z, 0.001), Math.max(-0.9689 * X + 1.8758 + 0.0415 * Z, 0.001), Math.max(0.0557 * X - 0.2040 + 1.0570 * Z, 0.001)];
+}
+const REF_RGB = rawRGB(planckianXY(WB_REFERENCE));
+
+/** Linear-sRGB colour of light at `kelvin` and `tint`, scaled so 6,500 K / tint 0 is [1, 1, 1] and green is 1. */
+export function illuminant(kelvin, tint = 0) {
+  const c = rawRGB(lightXY(kelvin, tint)), r = c[0] / REF_RGB[0], g = c[1] / REF_RGB[1], b = c[2] / REF_RGB[2];
   return [r / g, 1, b / g];
 }
 
-export function gainsForKelvin(kelvin) { const l = illuminant(kelvin); return [1 / l[0], 1, 1 / l[2]]; }
+export function gainsForKelvin(kelvin, tint = 0) { const l = illuminant(kelvin, tint); return [1 / l[0], 1, 1 / l[2]]; }
 export function gainsForNeutral([r, g, b]) { return [g / Math.max(r, 1e-6), 1, g / Math.max(b, 1e-6)]; }
 
-export function estimateKelvin([r, g, b]) {
+/** Nearest {kelvin, tint} to a measured light colour (coarse grid, then refined). */
+export function estimateLight([r, g, b]) {
   const tr = Math.log(r / Math.max(g, 1e-9)), tb = Math.log(b / Math.max(g, 1e-9));
-  let best = WB_REFERENCE, err = Infinity;
-  for (let k = 2000; k <= 10000; k += 25) {
-    const l = illuminant(k), e = (Math.log(l[0]) - tr) ** 2 + (Math.log(l[2]) - tb) ** 2;
-    if (e < err) { err = e; best = k; }
-  }
+  const err = (k, t) => { const l = illuminant(k, t); return (Math.log(l[0]) - tr) ** 2 + (Math.log(l[2]) - tb) ** 2; };
+  let best = { kelvin: WB_REFERENCE, tint: 0 }, bestErr = Infinity;
+  const search = (k0, k1, dk, t0, t1, dt) => {
+    for (let k = k0; k <= k1; k += dk) for (let t = t0; t <= t1; t += dt) { const e = err(k, t); if (e < bestErr) { bestErr = e; best = { kelvin: k, tint: t }; } }
+  };
+  search(2000, 10000, 100, -100, 100, 5);
+  search(best.kelvin - 100, best.kelvin + 100, 10, best.tint - 5, best.tint + 5, 1);
   return best;
 }
+export const estimateKelvin = c => estimateLight(c).kelvin;
 
 function applyGains(img, [gr, gg, gb]) {
   const n = img.r.length, out = { width: img.width, height: img.height, r: new Float32Array(n), g: new Float32Array(n), b: new Float32Array(n) };
@@ -519,7 +540,7 @@ function applyGains(img, [gr, gg, gb]) {
 }
 /** The scene as the sensor records it under light at `kelvin`. Images are sRGB-encoded R′G′B′. */
 // Exposure is set so the light's strongest channel is 1 (like auto-exposure), so white never clips.
-export const captureUnder = (img, kelvin) => { const l = illuminant(kelvin), m = Math.max(...l); return applyGains(img, l.map(v => v / m)); };
+export const captureUnder = (img, kelvin, tint = 0) => { const l = illuminant(kelvin, tint), m = Math.max(...l); return applyGains(img, l.map(v => v / m)); };
 export const correctWith = (captured, gains) => applyGains(captured, gains);
 
 /** Gray world: the scene's average linear colour, assumed to be the light. */

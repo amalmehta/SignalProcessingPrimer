@@ -199,3 +199,23 @@ final class WhiteBalanceTests: XCTestCase {
         XCTAssertEqual(est, 5000, accuracy: 100)
     }
 }
+
+final class TintTests: XCTestCase {
+    func testTintMovesTowardsGreenOrMagenta() {
+        let plain = WhiteBalance.illuminant(5000), green = WhiteBalance.illuminant(5000, tint: -50), magenta = WhiteBalance.illuminant(5000, tint: 50)
+        XCTAssertEqual(WhiteBalance.illuminant(5000, tint: 0), plain)
+        // Green is normalised to 1, so a greener light has smaller red and blue ratios.
+        XCTAssertLessThan(green.r, plain.r); XCTAssertLessThan(green.b, plain.b)
+        XCTAssertGreaterThan(magenta.r, plain.r); XCTAssertGreaterThan(magenta.b, plain.b)
+    }
+
+    func testCameraTintCancelsLightTintAndEstimateRecoversBoth() {
+        let p = WhiteBalance.grayPatchCentre()
+        let shot = WhiteBalance.capture(WhiteBalance.checkerChart(), lightKelvin: 4000, tint: -30)
+        let fixed = WhiteBalance.correct(shot, gains: WhiteBalance.gains(forKelvin: 4000, tint: -30))
+        let c = WhiteBalance.sample(fixed, x: p.x, y: p.y)
+        XCTAssertEqual(c.r / c.g, 1, accuracy: 0.02); XCTAssertEqual(c.b / c.g, 1, accuracy: 0.02)
+        let est = WhiteBalance.estimate(WhiteBalance.sample(shot, x: p.x, y: p.y))
+        XCTAssertEqual(est.kelvin, 4000, accuracy: 100); XCTAssertEqual(est.tint, -30, accuracy: 3)
+    }
+}

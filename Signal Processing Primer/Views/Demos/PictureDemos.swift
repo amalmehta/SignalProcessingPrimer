@@ -351,18 +351,22 @@ private struct ChromaPart: View {
 
 private struct WhiteBalancePart: View {
     enum Scene: String, CaseIterable, Identifiable { case chart = "Colour checker chart", photo = "Your photo"; var id: String { rawValue } }
-    enum Setting: Equatable { case kelvin, auto(Double), picked(Double) }
+    enum Setting: Equatable { case manual, auto(Double, Double), picked(Double, Double) }
 
     @State private var scene = Scene.chart
     @State private var lightK = 3200.0
+    @State private var lightTint = 0.0
     @State private var cameraK = 5600.0
-    @State private var setting = Setting.kelvin
+    @State private var cameraTint = 0.0
+    @State private var setting = Setting.manual
     @State private var gains = WhiteBalance.gains(forKelvin: 5600)
     @State private var shots: (asLit: RGBImage, result: RGBImage)?
     @AppStorage(Prefs.customImagePath) private var imagePath = ""
 
     private var source: RGBImage { scene == .photo && !imagePath.isEmpty ? DemoImage.currentColour() : WhiteBalance.checkerChart() }
-    private static let lights: [(String, Double)] = [("Candle", 2000), ("Tungsten", 3200), ("Daylight", 5600), ("Overcast", 6500), ("Shade", 8000)]
+    /// (name, kelvin, tint). Fluorescent tubes sit above the black-body curve, so they read green.
+    private static let lights: [(String, Double, Double)] = [
+        ("Candle", 2000, 0), ("Tungsten", 3200, 0), ("Fluorescent", 4000, -25), ("Daylight", 5600, 0), ("Overcast", 6500, 0), ("Shade", 8000, 0)]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -375,16 +379,22 @@ private struct WhiteBalancePart: View {
                 .help(imagePath.isEmpty ? "Choose a photo in Settings → Images to use it here" : "")
                 HStack(spacing: 6) {
                     Text("Light:").font(.callout).foregroundStyle(.secondary)
-                    ForEach(Self.lights, id: \.1) { name, k in
-                        Button(name) { lightK = k }.buttonStyle(.link).font(.callout)
+                    ForEach(Self.lights, id: \.0) { name, k, t in
+                        Button(name) { lightK = k; lightTint = t }.buttonStyle(.link).font(.callout)
                     }
                 }
             }
-            HStack(spacing: 24) {
-                ParamSlider(title: "Scene light", value: $lightK, range: 2000...10000, step: 50, format: { kelvin($0) })
-                ParamSlider(title: "Camera white balance", value: Binding(get: { cameraK }, set: { cameraK = $0; setting = .kelvin }),
-                            range: 2000...10000, step: 50, format: { kelvin($0) })
-                Button("Auto (gray world)") { auto() }
+            Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 8) {
+                GridRow {
+                    ParamSlider(title: "Scene light", value: $lightK, range: 2000...10000, step: 50, format: { kelvin($0) })
+                    ParamSlider(title: "Light tint", value: $lightTint, range: -100...100, step: 1, format: { tint($0) })
+                    Color.clear.frame(width: 1, height: 1)
+                }
+                GridRow {
+                    ParamSlider(title: "Camera white balance", value: manual($cameraK), range: 2000...10000, step: 50, format: { kelvin($0) })
+                    ParamSlider(title: "Camera tint", value: manual($cameraTint), range: -100...100, step: 1, format: { tint($0) })
+                    Button("Auto (gray world)") { auto() }
+                }
             }
             HStack(spacing: 32) {
                 Readout(label: "Camera setting", value: settingText)
@@ -401,11 +411,10 @@ private struct WhiteBalancePart: View {
             }
             .frame(maxHeight: 300)
         }
-        .onChange(of: cameraK) { _, k in if setting == .kelvin { gains = WhiteBalance.gains(forKelvin: k) } }
-        .task(id: "\(scene.rawValue)-\(lightK)-\(gains.r)-\(gains.b)-\(imagePath)") {
-            let src = source, light = lightK, g = gains
+        .task(id: "\(scene.rawValue)-\(lightK)-\(lightTint)-\(gains.r)-\(gains.b)-\(imagePath)") {
+            let src = source, light = lightK, lt = lightTint, g = gains
             shots = await Task.detached(priority: .userInitiated) {
-                let lit = WhiteBalance.capture(src, lightKelvin: light)
+                let lit = WhiteBalance.capture(src, lightKelvin: light, tint: lt)
                 return (lit, WhiteBalance.correct(lit, gains: g))
             }.value
         }
@@ -413,19 +422,30 @@ private struct WhiteBalancePart: View {
 
     private var settingText: String {
         switch setting {
-        case .kelvin: return kelvin(cameraK)
-        case .auto(let k): return "Auto ≈ \(kelvin(k))"
-        case .picked(let k): return "Picked ≈ \(kelvin(k))"
+        case .manual: return "\(kelvin(cameraK)), tint \(tint(cameraTint))"
+        case .auto(let k, let t): return "Auto ≈ \(kelvin(k)), tint \(tint(t))"
+        case .picked(let k, let t): return "Picked ≈ \(kelvin(k)), tint \(tint(t))"
         }
     }
 
     private func kelvin(_ k: Double) -> String { "\(Int(k).formatted()) K" }
+    private func tint(_ t: Double) -> String { t == 0 ? "0" : String(format: "%+.0f %@", t, t < 0 ? "green" : "magenta") }
+
+    /// A binding for the camera controls: moving one switches back to manual and recomputes the gains.
+    private func manual(_ value: Binding<Double>) -> Binding<Double> {
+        Binding(get: { value.wrappedValue }, set: {
+            value.wrappedValue = $0
+            setting = .manual
+            gains = WhiteBalance.gains(forKelvin: cameraK, tint: cameraTint)
+        })
+    }
 
     private func auto() {
         guard let lit = shots?.asLit else { return }
         let light = WhiteBalance.grayWorld(lit)
         gains = WhiteBalance.gains(neutral: light)
-        setting = .auto(WhiteBalance.estimateKelvin(light))
+        let e = WhiteBalance.estimate(light)
+        setting = .auto(e.kelvin, e.tint)
     }
 
     private func grayPatch(_ img: RGBImage) -> String {
@@ -457,6 +477,7 @@ private struct WhiteBalancePart: View {
         let x = Int(loc.x / size.width * CGFloat(lit.width)), y = Int(loc.y / size.height * CGFloat(lit.height))
         let c = WhiteBalance.sample(lit, x: min(max(x, 0), lit.width - 1), y: min(max(y, 0), lit.height - 1))
         gains = WhiteBalance.gains(neutral: c)
-        setting = .picked(WhiteBalance.estimateKelvin(c))
+        let e = WhiteBalance.estimate(c)
+        setting = .picked(e.kelvin, e.tint)
     }
 }

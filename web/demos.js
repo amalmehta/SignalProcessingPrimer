@@ -553,20 +553,24 @@ function chromaPart(host, ctx) {
 }
 
 function whiteBalancePart(host, ctx) {
-  let scene = 'chart', lightK = 3200, cameraK = 5600, setting = 'kelvin', estimate = 0, gains = D.gainsForKelvin(5600), lit, token = 0;
+  let scene = 'chart', lightK = 3200, lightTint = 0, cameraK = 5600, cameraTint = 0, setting = 'manual', estimate = null, gains = D.gainsForKelvin(5600), lit, token = 0;
   const ro = readouts(), asLit = rgbCanvas('As lit, no correction (camera at 6,500 K)'), result = rgbCanvas('Camera result — click a gray area to balance on it');
   const k = v => `${Math.round(v).toLocaleString()} K`;
-  const cam = slider('Camera white balance', { min: 2000, max: 10000, step: 50, value: cameraK, format: k }, v => { cameraK = v; setting = 'kelvin'; gains = D.gainsForKelvin(v); draw(); });
+  const tn = v => (v === 0 ? '0' : `${v > 0 ? '+' : ''}${v} ${v < 0 ? 'green' : 'magenta'}`);
+  const manual = () => { setting = 'manual'; gains = D.gainsForKelvin(cameraK, cameraTint); draw(); };
+  const cam = slider('Camera white balance', { min: 2000, max: 10000, step: 50, value: cameraK, format: k }, v => { cameraK = v; manual(); });
+  const camTint = slider('Camera tint', { min: -100, max: 100, step: 1, value: cameraTint, format: tn }, v => { cameraTint = v; manual(); });
   const light = slider('Scene light', { min: 2000, max: 10000, step: 50, value: lightK, format: k }, v => { lightK = v; draw(); });
+  const lightTintCtl = slider('Light tint', { min: -100, max: 100, step: 1, value: lightTint, format: tn }, v => { lightTint = v; draw(); });
   const draw = async () => {
     const my = ++token;
     const src = scene === 'photo' && ctx.hasCustomImage() ? await ctx.getColourImage() : D.checkerChart();
     await new Promise(r => setTimeout(r));
     if (my !== token) return;
-    lit = D.captureUnder(src, lightK);
+    lit = D.captureUnder(src, lightK, lightTint);
     const out = D.correctWith(lit, gains);
     asLit.draw(lit); result.draw(out);
-    const rows = [['Camera setting', setting === 'kelvin' ? k(cameraK) : `${setting === 'auto' ? 'Auto' : 'Picked'} ≈ ${k(estimate)}`],
+    const rows = [['Camera setting', setting === 'manual' ? `${k(cameraK)}, tint ${tn(cameraTint)}` : `${setting === 'auto' ? 'Auto' : 'Picked'} ≈ ${k(estimate.kelvin)}, tint ${tn(estimate.tint)}`],
       ['Gains applied (R · G · B)', gains.map(g => `×${g.toFixed(2)}`).join(' · ')]];
     if (scene === 'chart') {
       const [px, py] = D.grayPatchCentre(out.width), i = py * out.width + px;
@@ -574,7 +578,7 @@ function whiteBalancePart(host, ctx) {
     }
     ro.set(rows);
   };
-  const neutral = (c, how) => { gains = D.gainsForNeutral(c); estimate = D.estimateKelvin(c); setting = how; draw(); };
+  const neutral = (c, how) => { gains = D.gainsForNeutral(c); estimate = D.estimateLight(c); setting = how; draw(); };
   for (const fig of [asLit, result]) {
     const canvas = fig.querySelector('canvas');
     canvas.classList.add('pick');
@@ -587,9 +591,10 @@ function whiteBalancePart(host, ctx) {
   }
   const sceneSel = select('Scene', [['chart', 'Colour checker chart'], ['photo', 'Your photo (Settings → Images)']], scene, v => { scene = v; draw(); });
   const presets = h('div', { class: 'presets-row' }, h('span', { class: 'note' }, 'Light:'),
-    [['Candle', 2000], ['Tungsten', 3200], ['Daylight', 5600], ['Overcast', 6500], ['Shade', 8000]].map(([name, v]) =>
-      h('button', { class: 'link', type: 'button', onclick: () => { lightK = v; light.set(v); draw(); } }, name)));
-  host.append(row(sceneSel, presets), row(light, cam,
+    // Fluorescent tubes sit above the black-body curve, so they read green.
+    [['Candle', 2000, 0], ['Tungsten', 3200, 0], ['Fluorescent', 4000, -25], ['Daylight', 5600, 0], ['Overcast', 6500, 0], ['Shade', 8000, 0]].map(([name, v, t]) =>
+      h('button', { class: 'link', type: 'button', onclick: () => { lightK = v; lightTint = t; light.set(v); lightTintCtl.set(t); draw(); } }, name)));
+  host.append(row(sceneSel, presets), row(light, lightTintCtl), row(cam, camTint,
     h('button', { class: 'btn', type: 'button', onclick: () => lit && neutral(D.grayWorld(lit), 'auto') }, 'Auto (gray world)')),
     ro, h('div', { class: 'images two' }, asLit, result));
   draw();

@@ -32,7 +32,7 @@ To keep it, drag `Signal Processing Primer.app` from `build/Build/Products/Relea
 xcodebuild -project "Signal Processing Primer.xcodeproj" -scheme "Signal Processing Primer" -derivedDataPath build test
 ```
 
-There are 30 tests. 16 check the DSP maths (FFT, aliasing, quantisation SNR, convolution, biquads, the compressor, the DCT/JPEG round trip, image kernels, spectrograms). 4 check colour and gamma (transfer functions, shadow codes, Y′CbCr, chroma subsampling). 4 check white balance (light colour by temperature, camera presets, eyedropper, gray world). 6 check the course content, progress saving and the feedback file.
+There are 32 tests. 16 check the DSP maths (FFT, aliasing, quantisation SNR, convolution, biquads, the compressor, the DCT/JPEG round trip, image kernels, spectrograms). 4 check colour and gamma (transfer functions, shadow codes, Y′CbCr, chroma subsampling). 6 check white balance (light colour by temperature and tint, camera settings, eyedropper, gray world). 6 check the course content, progress saving and the feedback file.
 
 ## Using the app
 

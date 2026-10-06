@@ -154,3 +154,15 @@ test('white balance: gray world is exact on a colourless scene', () => {
   const chart = D.checkerChart(), gray = { ...chart, g: chart.r, b: chart.r };
   near(D.estimateKelvin(D.grayWorld(D.captureUnder(gray, 5000))), 5000, 100);
 });
+
+test('tint: green lowers R/G and B/G, magenta raises them; camera tint cancels light tint', () => {
+  const plain = D.illuminant(5000), green = D.illuminant(5000, -50), magenta = D.illuminant(5000, 50);
+  assert.deepEqual(D.illuminant(5000, 0), plain);
+  assert.ok(green[0] < plain[0] && green[2] < plain[2]);
+  assert.ok(magenta[0] > plain[0] && magenta[2] > plain[2]);
+  const [px, py] = D.grayPatchCentre(), shot = D.captureUnder(D.checkerChart(), 4000, -30);
+  const c = D.sampleLinear(D.correctWith(shot, D.gainsForKelvin(4000, -30)), px, py);
+  near(c[0] / c[1], 1, 0.02); near(c[2] / c[1], 1, 0.02);
+  const est = D.estimateLight(D.sampleLinear(shot, px, py));
+  near(est.kelvin, 4000, 100); near(est.tint, -30, 3);
+});
