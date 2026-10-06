@@ -47,7 +47,7 @@ enum DemoKind: String, CaseIterable, Codable {
     case sineMixer, aliasing, quantization
     case spectrum, windowing, spectrogram
     case convolution, filterDesigner, compressor
-    case imageKernels, jpeg, frameRate
+    case imageKernels, jpeg, frameRate, colourGamma
 }
 
 extension Course {

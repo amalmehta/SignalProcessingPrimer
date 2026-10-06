@@ -1,5 +1,5 @@
-// The twelve interactive demos. Each is `build(host, ctx)` → optional cleanup function.
-// ctx: { fs, play(samples), stop(), toneCount(), getImage(): Promise<img>, onImage(fn) }
+// The interactive demos (one per lesson). Each is `build(host, ctx)` → optional cleanup function.
+// ctx: { fs, play(samples), stop(), toneCount(), getImage(), getColourImage(): Promise<img>, onImage(fn) }
 import * as D from './dsp.js';
 import { LinePlot, wave, fmt } from './plot.js';
 
@@ -88,6 +88,46 @@ export function imageFromCanvas(c, maxSide = 360) {
   const d = g.getImageData(0, 0, w, hgt).data, px = new Float32Array(w * hgt);
   for (let i = 0; i < px.length; i++) px[i] = (0.2126 * d[i * 4] + 0.7152 * d[i * 4 + 1] + 0.0722 * d[i * 4 + 2]) / 255;
   return D.makeImage(w, hgt, px);
+}
+
+/** Colour version: {width, height, r, g, b} with R′G′B′ in 0…1. */
+export function rgbFromCanvas(c, maxSide = 360) {
+  const k = Math.min(1, maxSide / Math.max(c.width, c.height));
+  const w = Math.max(8, Math.round(c.width * k)), hgt = Math.max(8, Math.round(c.height * k));
+  const t = document.createElement('canvas'); t.width = w; t.height = hgt;
+  const g = t.getContext('2d'); g.drawImage(c, 0, 0, w, hgt);
+  const d = g.getImageData(0, 0, w, hgt).data, n = w * hgt;
+  const img = { width: w, height: hgt, r: new Float32Array(n), g: new Float32Array(n), b: new Float32Array(n) };
+  for (let i = 0; i < n; i++) { img.r[i] = d[i * 4] / 255; img.g[i] = d[i * 4 + 1] / 255; img.b[i] = d[i * 4 + 2] / 255; }
+  return img;
+}
+
+/** Colour test card: colour bars, a hue sweep, red text on blue, 1-px red/green stripes, a skin-tone patch. */
+export function colourCard(size = 320) {
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const g = c.getContext('2d'), s = size;
+  const bars = ['#bfbfbf', '#bfbf00', '#00bfbf', '#00bf00', '#bf00bf', '#bf0000', '#0000bf'];
+  bars.forEach((col, i) => { g.fillStyle = col; g.fillRect(i * s / 7, 0, s / 7 + 1, s * 0.32); });
+  for (let x = 0; x < s; x++) { g.fillStyle = `hsl(${x / s * 360} 80% 52%)`; g.fillRect(x, s * 0.32, 1, s * 0.18); }
+  g.fillStyle = '#0d1aa6'; g.fillRect(0, s * 0.5, s * 0.55, s * 0.5);
+  g.fillStyle = '#f21a1a'; g.font = `bold ${s * 0.06}px system-ui, sans-serif`;   // inside the centre crop
+  g.fillText('CHROMA', s * 0.27, s * 0.6); g.fillText('4:2:0', s * 0.27, s * 0.7);
+  for (let x = Math.floor(s * 0.55); x < s; x++) { g.fillStyle = x % 2 ? '#268c33' : '#cc3333'; g.fillRect(x, s * 0.5, 1, s * 0.25); }
+  g.fillStyle = '#db9e80'; g.fillRect(s * 0.55, s * 0.75, s * 0.45, s * 0.25);
+  return rgbFromCanvas(c);
+}
+
+function rgbCanvas(label) {
+  const canvas = h('canvas', { class: 'img' });
+  const fig = h('figure', { class: 'imgfig' }, canvas, h('figcaption', {}, label));
+  fig.draw = (img, caption) => {
+    canvas.width = img.width; canvas.height = img.height;
+    const c = canvas.getContext('2d'), data = c.createImageData(img.width, img.height);
+    for (let i = 0; i < img.r.length; i++) data.data.set([img.r[i] * 255, img.g[i] * 255, img.b[i] * 255, 255], i * 4);
+    c.putImageData(data, 0, 0);
+    if (caption) fig.querySelector('figcaption').textContent = caption;
+  };
+  return fig;
 }
 
 // ---------- Lesson 1: sine mixer ----------
@@ -440,7 +480,78 @@ function frameRate(host, ctx) {
   return () => cancelAnimationFrame(raf);
 }
 
+
+// ---------- Lesson 13: colour & gamma ----------
+function colourGamma(host, ctx) {
+  const body = h('div', { class: 'demo-body' });
+  const tabs = h('div', { class: 'segmented two', role: 'radiogroup', 'aria-label': 'Part' });
+  let off = null;
+  const show = part => {
+    off?.(); off = null; body.replaceChildren();
+    off = part === 'gamma' ? gammaPart(body) : chromaPart(body, ctx);
+  };
+  ['Gamma', 'Chroma subsampling'].forEach((label, i) => {
+    const id = `c${++uid}`, input = h('input', { type: 'radio', name: `part${uid}`, id, value: i ? 'chroma' : 'gamma' });
+    if (!i) input.checked = true;
+    input.addEventListener('change', () => show(input.value));
+    tabs.append(h('label', { for: id }, input, h('span', {}, label)));
+  });
+  host.append(tabs, body);
+  show('gamma');
+  return () => off?.();
+}
+
+function gammaPart(host) {
+  let transfer = 'sRGB', bits = 5;
+  const ro = readouts(), strips = h('div', { class: 'ramps' });
+  const strip = (label, t, b) => {
+    const c = h('canvas', { class: 'ramp-strip', width: 512, height: 1, role: 'img', 'aria-label': label });
+    const g = c.getContext('2d'), img = g.createImageData(512, 1);
+    D.storedRamp(512, b, t).forEach((l, i) => { const v = D.encodeTransfer('sRGB', l) * 255; img.data.set([v, v, v, 255], i * 4); });
+    g.putImageData(img, 0, 0);
+    return h('div', {}, h('div', { class: 'ramp-label' }, label), c);
+  };
+  const draw = () => {
+    ro.set([['Codes for the darkest 10% of light, stored linearly', String(D.codesBelow(0.1, bits, 'Linear'))],
+      [`…stored with ${transfer}`, String(D.codesBelow(0.1, bits, transfer))]]);
+    p.update([{ name: 'Linear (no gamma)', color: REF, dashed: true, points: [[0, 0], [1, 1]] },
+      { name: transfer, color: S1, points: Array.from({ length: 101 }, (_, i) => [i / 100, D.encodeTransfer(transfer, i / 100)]) }]);
+    strips.replaceChildren(
+      strip('Stored linearly — shadows band, highlights waste codes', 'Linear', bits),
+      strip(`Stored with ${transfer} — steps look even`, transfer, bits),
+      strip('Reference: smooth ramp (8-bit sRGB)', 'sRGB', 8),
+      h('p', { class: 'note' }, `Each strip is the same ramp of light, dark to bright, after storing it at ${bits} bits.`));
+  };
+  host.append(row(select('Transfer function', D.TRANSFERS, transfer, v => { transfer = v; draw(); }),
+    slider('Bit depth', { min: 2, max: 8, step: 1, value: bits, format: v => `${v} bits (${2 ** v} levels)` }, v => { bits = v; draw(); })), ro);
+  const pair = h('div', { class: 'pair narrow-first' }); host.append(pair);
+  const p = plotBox(pair, { xLabel: 'Linear light', yLabel: 'Stored value', yDomain: [0, 1], xDomain: [0, 1], height: 240 });
+  pair.append(strips);
+  draw();
+  return null;
+}
+
+function chromaPart(host, ctx) {
+  let mode = '4:2:0', channel = 'Result', zoom = true, token = 0;
+  const ro = readouts(), before = rgbCanvas('Original (4:4:4)'), after = rgbCanvas('');
+  const draw = async () => {
+    const my = ++token, img = await ctx.getColourImage();
+    before.draw(zoom ? D.centreCropRGB(img) : img);
+    await new Promise(r => setTimeout(r));
+    if (my !== token) return;
+    const res = D.subsample(img, mode), view = D.channelView(channel, res), q = D.psnrRGB(img, res.image);
+    after.draw(zoom ? D.centreCropRGB(view) : view, `${mode} · ${channel}`);
+    ro.set([['Samples stored per pixel (4:4:4 = 3)', D.samplesPerPixel(mode).toFixed(1)], ['Data vs 4:4:4', `${Math.round(D.samplesPerPixel(mode) / 3 * 100)}%`],
+      ['Quality (PSNR, higher is better)', Number.isFinite(q) && q < 90 ? `${q.toFixed(1)} dB` : 'lossless']]);
+  };
+  host.append(row(select('Subsampling', Object.keys(D.SUBSAMPLING), mode, v => { mode = v; draw(); }),
+    select('Show', ['Result', 'Y′ (luma)', 'Cb (blue − luma)', 'Cr (red − luma)'], channel, v => { channel = v; draw(); }),
+    toggle('Zoom 2× on centre', zoom, v => { zoom = v; draw(); })), ro, h('div', { class: 'images two' }, before, after));
+  draw();
+  return ctx.onImage(draw);
+}
+
 export const DEMOS = {
   sineMixer, aliasing, quantization, spectrum, windowing, spectrogram: spectrogramDemo,
-  convolution, filterDesigner, compressor: compressorDemo, imageKernels, jpeg, frameRate,
+  convolution, filterDesigner, compressor: compressorDemo, imageKernels, jpeg, frameRate, colourGamma,
 };

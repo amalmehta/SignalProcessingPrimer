@@ -32,18 +32,18 @@ To keep it, drag `Signal Processing Primer.app` from `build/Build/Products/Relea
 xcodebuild -project "Signal Processing Primer.xcodeproj" -scheme "Signal Processing Primer" -derivedDataPath build test
 ```
 
-There are 22 tests. 16 check the DSP maths (FFT, aliasing, quantisation SNR, convolution, biquads, the compressor, the DCT/JPEG round trip, image kernels, spectrograms). 6 check the course content, progress saving and the feedback file.
+There are 26 tests. 16 check the DSP maths (FFT, aliasing, quantisation SNR, convolution, biquads, the compressor, the DCT/JPEG round trip, image kernels, spectrograms). 4 check colour and gamma (transfer functions, shadow codes, Y′CbCr, chroma subsampling). 6 check the course content, progress saving and the feedback file.
 
 ## Using the app
 
-- **Sidebar:** the 12 lessons in 4 modules. A green tick means you passed that lesson's quiz. The bar at the bottom shows your overall progress.
+- **Sidebar:** the 13 lessons in 4 modules. A green tick means you passed that lesson's quiz. The bar at the bottom shows your overall progress.
 - **Lesson page:** text, formulas and an *In practice* box on real-world audio, video and film uses. The **Try it** demo sits in the middle, and the quiz is at the end. **Next** goes to the following lesson.
 - **Demos:** move the sliders and the plots update straight away. Hover over a chart to read its values. **Play** buttons let you hear the result. Start with the volume low, because the aliasing and low-bit-depth demos are deliberately harsh.
 - **Quiz:** pick an answer for each question, then click **Check Answers**. Get enough right (2 of 3 by default) and the lesson is marked complete.
 - **Settings** (⌘, or the gear in the toolbar):
   - Reading: text size, answer explanations, pass mark
   - Sound: demo volume, tone length, test sound
-  - Images: use your own photo in the picture demos
+  - Images: use your own photo in the picture demos (grayscale in Lessons 10–11, colour in Lesson 13)
   - Progress: reset your progress
 - **Feedback** (the small button at the bottom of the sidebar, or ⇧⌘F): pick a type and write your note.
   - **Save** appends it to `~/Library/Application Support/Signal Processing Primer/Feedback.jsonl`.
@@ -53,7 +53,7 @@ There are 22 tests. 16 check the DSP maths (FFT, aliasing, quantisation SNR, con
 
 The website is published as a private Artifact: <https://claude.ai/artifact/4mZjs9pvjHnj2D5RcxiPtu>. Only you can open it until you share it from the page's Share menu.
 
-It has the same 12 lessons, demos, quizzes, settings and feedback as the Mac app.
+It has the same 13 lessons, demos, quizzes, settings and feedback as the Mac app.
 - **Settings:** the gear button, or ⌘, while the page has focus.
 - **Feedback:** the small *Feedback* tab on the right edge, or ⇧⌘F.
 - **Saved data:** progress and settings are saved in each visitor's own browser. A photo you load for the picture demos is kept only for that browser tab.

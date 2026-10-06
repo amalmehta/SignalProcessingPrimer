@@ -1,6 +1,6 @@
 // Website shell: loads the shared course.json, renders lessons, runs quizzes, and keeps
 // progress + settings in this browser's storage. Mirrors the Mac app's behaviour.
-import { DEMOS, testCard, imageFromCanvas } from './demos.js';
+import { DEMOS, testCard, imageFromCanvas, colourCard, rgbFromCanvas } from './demos.js';
 
 const FS = 44100;
 const ISSUES_URL = 'https://github.com/amalmehta/SignalProcessingPrimer/issues/new';
@@ -35,12 +35,13 @@ function play(samples) {
 function stop() { try { current?.stop(); } catch { /* already stopped */ } current = null; }
 
 // ---------- demo image (test card or the viewer's own photo, this session only) ----------
-let customImage = null, cardCache = null;
+let customImage = null, customColour = null, cardCache = null, colourCardCache = null;
 const imageListeners = new Set();
 const demoCtx = {
   fs: FS, play, stop,
   toneCount: () => Math.round(FS * prefs.toneSeconds),
   getImage: async () => customImage || (cardCache ??= testCard()),
+  getColourImage: async () => customColour || (colourCardCache ??= colourCard()),
   onImage(fn) { imageListeners.add(fn); return () => imageListeners.delete(fn); },
 };
 
@@ -78,7 +79,7 @@ function renderWelcome() {
   const resume = lessons.find(l => l.id === progress.lastLessonID);
   $('#main').innerHTML = `
     <article class="welcome">
-      <p class="eyebrow">A hands-on course · 12 lessons · 4 modules</p>
+      <p class="eyebrow">A hands-on course · ${lessons.length} lessons · ${course.modules.length} modules</p>
       <h1>Signal Processing Primer</h1>
       <p class="lede">The maths behind audio, images, video and film. Every lesson has something to play with and listen to, and a short quiz.</p>
       <div class="modules">${course.modules.map(m => `
@@ -207,11 +208,12 @@ function wireSettings() {
       const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight;
       c.getContext('2d').drawImage(im, 0, 0);
       customImage = Object.assign(imageFromCanvas(c), { name: file.name });
+      customColour = rgbFromCanvas(c);
       URL.revokeObjectURL(im.src); fillSettings(); imageListeners.forEach(fn => fn());
     };
     im.src = URL.createObjectURL(file);
   });
-  $('#set-image-reset').addEventListener('click', () => { customImage = null; $('#set-image').value = ''; fillSettings(); imageListeners.forEach(fn => fn()); });
+  $('#set-image-reset').addEventListener('click', () => { customImage = null; customColour = null; $('#set-image').value = ''; fillSettings(); imageListeners.forEach(fn => fn()); });
   $('#reset-ask').addEventListener('click', () => { $('#reset-confirm').hidden = false; });
   $('#reset-no').addEventListener('click', () => { $('#reset-confirm').hidden = true; });
   $('#reset-yes').addEventListener('click', () => {

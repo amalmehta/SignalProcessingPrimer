@@ -377,3 +377,97 @@ export function apparentWheelSpeed(revsPerSecond, fps, spokes) {
   const adv = revsPerSecond * spokes / fps;
   return (adv - Math.round(adv)) * fps / spokes;
 }
+
+// ---------- Colour & gamma (Lesson 13) ----------
+
+export const TRANSFERS = ['sRGB', 'Power 2.2', 'BT.1886 (2.4)'];
+
+/** Linear light → stored value. */
+export function encodeTransfer(name, l) {
+  l = Math.min(Math.max(l, 0), 1);
+  switch (name) {
+    case 'sRGB': return l <= 0.0031308 ? 12.92 * l : 1.055 * l ** (1 / 2.4) - 0.055;
+    case 'Power 2.2': return l ** (1 / 2.2);
+    case 'BT.1886 (2.4)': return l ** (1 / 2.4);
+    default: return l;                                   // 'Linear'
+  }
+}
+
+/** Stored value → linear light. */
+export function decodeTransfer(name, v) {
+  v = Math.min(Math.max(v, 0), 1);
+  switch (name) {
+    case 'sRGB': return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    case 'Power 2.2': return v ** 2.2;
+    case 'BT.1886 (2.4)': return v ** 2.4;
+    default: return v;
+  }
+}
+
+export function quantizeUnit(v, bits) { const levels = 2 ** bits - 1; return Math.round(Math.min(Math.max(v, 0), 1) * levels) / levels; }
+
+/** Linear-light ramp 0→1 stored at `bits` through `transfer`; returns the light the display emits. */
+export function storedRamp(count, bits, transfer) {
+  return Array.from({ length: count }, (_, i) => decodeTransfer(transfer, quantizeUnit(encodeTransfer(transfer, i / Math.max(count - 1, 1)), bits)));
+}
+
+/** Distinct codes covering linear light below `limit`. */
+export function codesBelow(limit, bits, transfer) { return Math.floor(encodeTransfer(transfer, limit) * (2 ** bits - 1)) + 1; }
+
+// Y′CbCr, BT.601 full range (JPEG).
+export function toYCbCr(r, g, b) {
+  return [0.299 * r + 0.587 * g + 0.114 * b, -0.168736 * r - 0.331264 * g + 0.5 * b, 0.5 * r - 0.418688 * g - 0.081312 * b];
+}
+export function toRGB(y, cb, cr) { return [y + 1.402 * cr, y - 0.344136 * cb - 0.714136 * cr, y + 1.772 * cb]; }
+
+export const SUBSAMPLING = { '4:4:4': [1, 1], '4:2:2': [2, 1], '4:2:0': [2, 2] };
+export const samplesPerPixel = mode => { const [w, h] = SUBSAMPLING[mode]; return 1 + 2 / (w * h); };
+
+/** img: {width, height, r, g, b} (R′G′B′ 0…1). Returns {image, y, cb, cr}. */
+export function subsample(img, mode) {
+  const n = img.width * img.height, y = new Float32Array(n), cb = new Float32Array(n), cr = new Float32Array(n);
+  for (let i = 0; i < n; i++) [y[i], cb[i], cr[i]] = toYCbCr(img.r[i], img.g[i], img.b[i]);
+  const [bw, bh] = SUBSAMPLING[mode];
+  if (bw * bh > 1) {
+    for (let by = 0; by < img.height; by += bh) for (let bx = 0; bx < img.width; bx += bw) {
+      const idx = [];
+      for (let dy = 0; dy < bh && by + dy < img.height; dy++) for (let dx = 0; dx < bw && bx + dx < img.width; dx++) idx.push((by + dy) * img.width + bx + dx);
+      const sb = idx.reduce((s, i) => s + cb[i], 0) / idx.length, sr = idx.reduce((s, i) => s + cr[i], 0) / idx.length;
+      for (const i of idx) { cb[i] = sb; cr[i] = sr; }
+    }
+  }
+  const out = { width: img.width, height: img.height, r: new Float32Array(n), g: new Float32Array(n), b: new Float32Array(n) };
+  for (let i = 0; i < n; i++) {
+    const [r, g, b] = toRGB(y[i], cb[i], cr[i]);
+    out.r[i] = Math.min(Math.max(r, 0), 1); out.g[i] = Math.min(Math.max(g, 0), 1); out.b[i] = Math.min(Math.max(b, 0), 1);
+  }
+  return { image: out, y, cb, cr };
+}
+
+/** 'Result' | 'Y′ (luma)' | 'Cb (blue − luma)' | 'Cr (red − luma)'. */
+export function channelView(channel, { image, y, cb, cr }) {
+  if (channel === 'Result') return image;
+  const n = y.length, out = { width: image.width, height: image.height, r: new Float32Array(n), g: new Float32Array(n), b: new Float32Array(n) };
+  for (let i = 0; i < n; i++) {
+    const [r, g, b] = channel.startsWith('Y') ? [y[i], y[i], y[i]] : channel.startsWith('Cb') ? toRGB(0.5, cb[i], 0) : toRGB(0.5, 0, cr[i]);
+    out.r[i] = Math.min(Math.max(r, 0), 1); out.g[i] = Math.min(Math.max(g, 0), 1); out.b[i] = Math.min(Math.max(b, 0), 1);
+  }
+  return out;
+}
+
+export function psnrRGB(a, b) {
+  let se = 0;
+  for (let i = 0; i < a.r.length; i++) se += (a.r[i] - b.r[i]) ** 2 + (a.g[i] - b.g[i]) ** 2 + (a.b[i] - b.b[i]) ** 2;
+  const mse = se / (a.r.length * 3);
+  return mse === 0 ? Infinity : 10 * Math.log10(1 / mse);
+}
+
+export function centreCropRGB(img) {
+  const w = img.width >> 1, h = img.height >> 1, x0 = img.width >> 2, y0 = img.height >> 2;
+  const out = { width: w, height: h, r: new Float32Array(w * h), g: new Float32Array(w * h), b: new Float32Array(w * h) };
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = (y0 + y) * img.width + x0 + x, o = y * w + x;
+    out.r[o] = img.r[i]; out.g[o] = img.g[i]; out.b[o] = img.b[i];
+  }
+  return out;
+}

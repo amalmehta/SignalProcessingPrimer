@@ -69,7 +69,7 @@ private struct ImageSettings: View {
                 }
                 Button("Use Test Card") { customImagePath = "" }.disabled(customImagePath.isEmpty)
             }
-            Text("Images are converted to grayscale and scaled to at most 360 px so filters run instantly.")
+            Text("Images are scaled to at most 360 px so filters run instantly. Lessons 10–11 use them in grayscale; Lesson 13 in colour.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }

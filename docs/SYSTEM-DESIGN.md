@@ -73,6 +73,7 @@ flowchart TB
 | Demo views | One view per `DemoKind`. Each keeps its own `@State` parameters, calls the engine to compute plots and sounds, and redraws on every change. The heavy image work runs in a detached task. |
 | `Components` | Shared building blocks: the validated colour palette, `ParamSlider`, `PlayButton`/`StopButton`, `Readout`, `DemoCard` and `LinePlot`. `LinePlot` is a Swift Charts line chart with a legend only when there are two or more series, explicit domains and a hover crosshair with a tooltip. |
 | `DSP` | Pure 1-D maths on `[Float]`: tone and chirp generation, aliasing, quantisation and dither, SNR, windows, an FFT magnitude spectrum (Accelerate `vDSP.DiscreteFourierTransform`), STFT, dense and sparse convolution, RBJ biquads with frequency response, and a feed-forward compressor. |
+| `ColourDSP` / `RGBImage` | Lesson 13's maths: four transfer functions (linear, sRGB, power 2.2, BT.1886 2.4), quantizing a linear-light ramp through each, counting codes in the shadows, BT.601 Y′CbCr conversion, 4:4:4/4:2:2/4:2:0 subsampling (block-average chroma, then replicate), channel views and RGB PSNR. Also draws a colour test card with bars, a hue sweep, red text on blue, 1-px red/green stripes and a skin-tone patch. |
 | `ImageDSP` / `GrayImage` | Pure 2-D maths: a procedural test card, 2-D convolution kernels (blur, sharpen, Sobel, emboss), an orthonormal 8×8 DCT/IDCT, JPEG quantisation tables scaled like libjpeg, a JPEG round trip with zero-coefficient share and PSNR, and CGImage conversion. |
 | `TonePlayer` | One shared `AVAudioEngine` and player node. It plays a mono buffer at 44.1 kHz with 10 ms fades and stops the previous sound first. |
 | `ProgressStore` | Completed lessons, best quiz scores and the last-visited lesson, saved as JSON in `UserDefaults`. |
@@ -106,7 +107,7 @@ Nothing leaves the Mac unless you click **Open as GitHub Issue** and submit the 
 - **Pure engine functions.** All maths is in stateless functions on plain arrays. That makes it easy to unit-test and to reuse in a future website port, at the cost of recomputing on every redraw. This is fine at these sizes: FFTs of 4,096 points or fewer, about 2 s of audio, images of 360 px or less.
 - **Compute in the view body for audio demos.** It keeps the code simple, and the results come back in well under a frame on modern Macs. Image filtering and JPEG are slower (up to about 0.3 s in Debug builds), so they run in a detached task.
 - **Generated test material.** Tones, drum loops, chirps and the test card are all synthesised, so there are no licensing questions and the repo stays small. Users can still load their own photo.
-- **Grayscale images.** Working on luminance only keeps the 2-D lessons about frequency rather than colour. Colour science, chroma subsampling and gamma are explained in the text but have no demos.
+- **Grayscale images for Lessons 10–11, colour for Lesson 13.** Filtering and JPEG work on luminance only, so those lessons stay about spatial frequency. Lesson 13 handles colour separately: gamma is shown as stored ramps, not on a photo, so the banding is unambiguous. Chroma subsampling uses a test card built to expose it, or your own photo in colour.
 - **Echoes by sparse convolution.** A 400 ms echo would be a 17,640-tap kernel. `sparseConvolve` applies only the non-zero taps, and a test checks it matches dense convolution exactly.
 - **Charts follow the dataviz rules.** There is one fixed categorical pair: blue for the processed or main signal, orange for the original or reference. The reference is dashed, so colour is never the only cue. There are no dual axes, legends appear only for two or more series, and every chart has a hover read-out. The spectrogram uses a single-hue sequential blue ramp with separate light and dark steps.
 - **Local-only feedback.** Feedback is never sent anywhere automatically, so it needs no accounts or keys. Reaching the developer needs one extra click to the GitHub issue page.
@@ -114,6 +115,7 @@ Nothing leaves the Mac unless you click **Open as GitHub Issue** and submit the 
 
 ## How it's tested
 
+- `ColourTests` (4) check that every transfer function inverts exactly, that the lesson's numbers hold (26 vs 90 codes for the darkest 10% at 8 bits), Y′CbCr round trips, and that 4:2:0 keeps luma exactly while losing chroma detail.
 - `DSPTests` (16) check the maths against known answers:
   - alias folding
   - FFT bin and amplitude
@@ -127,10 +129,10 @@ Nothing leaves the Mac unless you click **Open as GitHub Issue** and submit the 
   - JPEG: lower quality gives more zeros and lower PSNR
   - blur leaves flat regions unchanged, and Sobel finds edges
   - a spectrogram of a chirp rises over time
-- `CourseTests` (6) check the course shape (4 modules, 12 lessons), every lesson's integrity, unique ids with every demo used exactly once, the navigation helpers, `ProgressStore` persistence and pass mark (using an isolated `UserDefaults` suite), and the feedback file and issue URL.
-- **Visual check:** `scripts/screenshots.sh` opens each lesson at its demo and captures it. All 12 demos, Settings and the Feedback sheet were reviewed this way.
-- **Website:** `web/tests/dsp.test.mjs` (14 Node tests) mirrors `DSPTests` and also checks that `course.json` is well formed. The site was checked in a browser:
-  - all 12 lessons render with no console errors
+- `CourseTests` (6) check the course shape (4 modules, 13 lessons), every lesson's integrity, unique ids with every demo used exactly once, the navigation helpers, `ProgressStore` persistence and pass mark (using an isolated `UserDefaults` suite), and the feedback file and issue URL.
+- **Visual check:** `scripts/screenshots.sh` opens each lesson at its demo and captures it. All 13 demos, Settings and the Feedback sheet were reviewed this way.
+- **Website:** `web/tests/dsp.test.mjs` (17 Node tests) mirrors `DSPTests` and also checks that `course.json` is well formed. The site was checked in a browser:
+  - all 13 lessons render with no console errors
   - no page overflows sideways at 375 px
   - light and dark themes both work
   - quiz pass and fail paths work, and progress is saved
@@ -143,7 +145,7 @@ flowchart TB
     Host["Artifact host<br/>(wraps index.html in a page skeleton)"] --> Index["index.html<br/>sidebar · main · Settings + Feedback dialogs"]
     Index --> App["app.js<br/>router (#lesson-id) · lesson renderer · quiz · settings · feedback · Web Audio"]
     App -- "fetch" --> CJ[("course.json")]
-    App --> Demos["demos.js<br/>12 demos + test card"]
+    App --> Demos["demos.js<br/>13 demos + test cards"]
     Demos --> Plot["plot.js<br/>SVG line chart + hover"]
     Demos --> DSPjs["dsp.js<br/>pure maths (port of DSP.swift)"]
     App --> LS[("localStorage<br/>spp.progress · spp.prefs")]
@@ -168,7 +170,7 @@ flowchart TB
 ## Known limits
 
 - **Website:** progress isn't synced between browsers or with the Mac app. Visitors without repo access can't file GitHub issues. The heavy image demos run on the main thread, so the page pauses briefly on slow phones.
-- **Picture demos are grayscale only.** There's no colour, chroma-subsampling or gamma demo.
+- **Colour demo scope.** Lesson 13 doesn't cover white balance, colour spaces or gamuts (Rec.709 vs P3 vs Rec.2020), or HDR transfer functions. Those are mentioned in the text only.
 - **Recomputation.** Audio demos recompute synchronously on every slider movement. They're fine at current sizes but would need debouncing for longer signals.
 - **No live input.** There is no microphone or camera input (you chose demos without it).
 - **Two non-standard visual choices:**

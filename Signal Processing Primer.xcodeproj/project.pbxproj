@@ -15,6 +15,7 @@
 		4876878DD51387F3F970171B /* LessonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4EBEA960C36449C712BED35 /* LessonView.swift */; };
 		498C86EDCBC6FB72A25A110A /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F13401D70B1ACC95A2F5A01 /* Components.swift */; };
 		608F5887E98AB3C0CAF69438 /* Course.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86D3F2CE95B39E674ABED9A9 /* Course.swift */; };
+		68F4A154895109C1DE67A734 /* ColourDSP.swift in Sources */ = {isa = PBXBuildFile; fileRef = F454A095F22624A5920DD2FE /* ColourDSP.swift */; };
 		6D8C23B433B6141F14B49AE0 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E1A9BFD3D34890F3CBA0131 /* SettingsView.swift */; };
 		796E41C507B660C5C0F72D61 /* SignalProcessingPrimerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35942DF5A600D57A99F7C458 /* SignalProcessingPrimerApp.swift */; };
 		8912B17D7E31C7228DE5ACB2 /* FeedbackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C77A83B81B334CAF7F44B878 /* FeedbackView.swift */; };
@@ -63,6 +64,7 @@
 		B46FAF6B00F55981D5A40032 /* DSP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DSP.swift; sourceTree = "<group>"; };
 		C77A83B81B334CAF7F44B878 /* FeedbackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackView.swift; sourceTree = "<group>"; };
 		D343F408AFFA0C5CF88029D5 /* DSPTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DSPTests.swift; sourceTree = "<group>"; };
+		F454A095F22624A5920DD2FE /* ColourDSP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColourDSP.swift; sourceTree = "<group>"; };
 		F4EBEA960C36449C712BED35 /* LessonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LessonView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -70,6 +72,7 @@
 		0B5AA176CE174CD09AA24340 /* DSP */ = {
 			isa = PBXGroup;
 			children = (
+				F454A095F22624A5920DD2FE /* ColourDSP.swift */,
 				B46FAF6B00F55981D5A40032 /* DSP.swift */,
 				6164A700409620FFFF9E75FB /* ImageDSP.swift */,
 			);
@@ -278,6 +281,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				198F227E13E730A80A33F9C1 /* AppState.swift in Sources */,
+				68F4A154895109C1DE67A734 /* ColourDSP.swift in Sources */,
 				498C86EDCBC6FB72A25A110A /* Components.swift in Sources */,
 				C57B0D508D7E3A1ACF3330BA /* ContentView.swift in Sources */,
 				608F5887E98AB3C0CAF69438 /* Course.swift in Sources */,

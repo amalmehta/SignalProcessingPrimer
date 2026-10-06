@@ -92,7 +92,7 @@ struct WelcomeView: View {
             VStack(alignment: .leading, spacing: 20) {
                 Image(systemName: "waveform.path.ecg").font(.system(size: 44)).foregroundStyle(Color.series1)
                 Text("Signal Processing Primer").font(.largeTitle.bold())
-                Text("A hands-on course in the maths behind audio, images, video and film. Twelve lessons, each with something to play with and a short quiz.")
+                Text("A hands-on course in the maths behind audio, images, video and film. \(Course.allLessons.count) lessons, each with something to play with and a short quiz.")
                     .font(.title3).foregroundStyle(.secondary)
                 ForEach(Course.modules) { module in
                     VStack(alignment: .leading, spacing: 6) {

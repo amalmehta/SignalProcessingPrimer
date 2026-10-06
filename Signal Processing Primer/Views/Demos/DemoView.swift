@@ -18,6 +18,7 @@ struct DemoView: View {
         case .imageKernels:   ImageKernelsDemo()
         case .jpeg:           JPEGDemo()
         case .frameRate:      FrameRateDemo()
+        case .colourGamma:    ColourGammaDemo()
         }
     }
 }

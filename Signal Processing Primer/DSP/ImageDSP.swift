@@ -127,9 +127,15 @@ enum ImageDSP {
         18, 22, 37, 56, 68, 109, 103, 77, 24, 35, 55, 64, 81, 104, 113, 92,
         49, 64, 78, 87, 103, 121, 120, 101, 72, 92, 95, 98, 112, 100, 103, 99]
 
-    private static let cosTable: [Float] = (0..<8).flatMap { x in
-        (0..<8).map { u in Float(cos(Double(2 * x + 1) * Double(u) * .pi / 16)) }
-    }
+    /// cos((2x+1)uπ/16), indexed [x * 8 + u].
+    private static let cosTable: [Float] = {
+        var t = [Float](repeating: 0, count: 64)
+        for x in 0..<8 { for u in 0..<8 {
+            let angle: Double = Double(2 * x + 1) * Double(u) * Double.pi / 16
+            t[x * 8 + u] = Float(cos(angle))
+        } }
+        return t
+    }()
     private static func c(_ u: Int) -> Float { u == 0 ? Float(1 / sqrt(2.0)) : 1 }
 
     /// 8×8 DCT-II (orthonormal JPEG scaling). Input/output row-major, 64 values.

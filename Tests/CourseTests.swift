@@ -4,7 +4,7 @@ import XCTest
 final class CourseTests: XCTestCase {
     func testCourseShape() {
         XCTAssertEqual(Course.modules.count, 4)
-        XCTAssertEqual(Course.allLessons.count, 12)
+        XCTAssertEqual(Course.allLessons.count, 13)
     }
 
     func testEveryLessonIsComplete() {

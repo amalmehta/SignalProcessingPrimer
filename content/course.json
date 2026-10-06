@@ -938,6 +938,100 @@
               "explanation": "Each frame it turns 3/24 = 1/8 revolution — exactly one spoke spacing — so every frame looks identical."
             }
           ]
+        },
+        {
+          "id": "colour",
+          "title": "Colour, Gamma and Chroma",
+          "summary": "Why pixel values aren't light, and why colour can be stored at lower resolution than brightness.",
+          "demo": "colourGamma",
+          "demoCaption": "Gamma: lower the bit depth and compare where linear storage bands. Chroma: subsample the colour, then look at the red text on blue and the fine coloured stripes.",
+          "blocks": [
+            {
+              "type": "text",
+              "text": "A camera sensor counts photons, so its raw output is proportional to **linear light**: twice the photons, twice the value. Our eyes don't work that way. We're far more sensitive to small changes in dark tones than in bright ones, and perceived lightness grows roughly with the cube root of light."
+            },
+            {
+              "type": "text",
+              "text": "**Gamma encoding** bridges the two. Before storing a pixel, the camera raises linear light to a power of about 1/2.2 (the *transfer function*), so equal steps in code value look like equal steps in brightness. The display applies the inverse power to turn codes back into light."
+            },
+            {
+              "type": "equation",
+              "text": "V = L^(1/γ)      L = V^γ",
+              "caption": "L = linear light, V = stored value, both 0…1. γ ≈ 2.2 for sRGB; HD/TV mastering displays use 2.4 (BT.1886)"
+            },
+            {
+              "type": "text",
+              "text": "It matters because every value is **quantized** (Lesson 3). Store 8-bit values linearly and the darkest 10% of light gets only about 26 codes, so shadows band visibly, while the highlights get codes the eye can't tell apart. With sRGB encoding, the same 10% gets about 90 codes."
+            },
+            {
+              "type": "demo"
+            },
+            {
+              "type": "heading",
+              "text": "Colour as three signals"
+            },
+            {
+              "type": "text",
+              "text": "Screens mix red, green and blue light. Video and JPEG convert gamma-encoded R′G′B′ into **Y′** (luma, the brightness signal) and two **colour-difference** signals: Cb (blue minus luma) and Cr (red minus luma)."
+            },
+            {
+              "type": "equation",
+              "text": "Y′ = 0.299 R′ + 0.587 G′ + 0.114 B′",
+              "caption": "BT.601 weights, used by JPEG; HD video (BT.709) uses 0.2126, 0.7152, 0.0722"
+            },
+            {
+              "type": "text",
+              "text": "The eye resolves fine detail in brightness much better than in colour, so the colour-difference signals can be stored at lower resolution. That's **chroma subsampling**. 4:2:2 halves chroma horizontally. 4:2:0 halves it both ways, keeping a quarter of the chroma samples and half the total data of 4:4:4."
+            },
+            {
+              "type": "bullets",
+              "items": [
+                "**4:4:4**: full colour resolution. Used for VFX plates, computer graphics and screen recordings.",
+                "**4:2:2**: broadcast and mastering formats such as ProRes 422 and XAVC.",
+                "**4:2:0**: almost all delivery. Streaming, Blu-ray, H.264/HEVC, phone video and most JPEGs."
+              ]
+            },
+            {
+              "type": "inPractice",
+              "title": "Grading, keying and delivery",
+              "body": "Colourists do maths like exposure and blending in **linear light**, where it's physically correct, then encode for the display. Camera **log** curves (S-Log, LogC, V-Log) are extreme transfer functions that fit 14+ stops of dynamic range into 10 bits. Green-screen keys pull far cleaner edges from 4:4:4 or 4:2:2 footage than 4:2:0, because the edge lives in the chroma. Designers avoid thin, saturated red text over blue in delivered video, because 4:2:0 smears it. HDR replaces gamma with the PQ (SMPTE ST 2084) and HLG transfer functions."
+            }
+          ],
+          "quiz": [
+            {
+              "prompt": "Why do images and video store gamma-encoded values instead of linear light?",
+              "choices": [
+                "To make images brighter",
+                "To spend code values evenly in perceived brightness, so shadows don't band",
+                "To remove sensor noise",
+                "To increase resolution"
+              ],
+              "answer": 1,
+              "explanation": "Quantization steps are spread where the eye is most sensitive: the dark tones."
+            },
+            {
+              "prompt": "What does 4:2:0 chroma subsampling reduce?",
+              "choices": [
+                "Brightness resolution",
+                "Colour resolution, both horizontally and vertically",
+                "Frame rate",
+                "Bit depth"
+              ],
+              "answer": 1,
+              "explanation": "Chroma is stored at half resolution in both directions; luma stays at full resolution."
+            },
+            {
+              "prompt": "Why does chroma subsampling usually go unnoticed?",
+              "choices": [
+                "The eye sees fine detail mainly in brightness, not colour",
+                "Screens can't show colour detail",
+                "Codecs restore the colour exactly",
+                "Colour has no high frequencies"
+              ],
+              "answer": 0,
+              "explanation": "Our visual system resolves luminance detail much better than chrominance detail, so halving chroma resolution is hard to see in most images."
+            }
+          ]
         }
       ]
     }

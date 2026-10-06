@@ -63,8 +63,11 @@ Decided without asking:
   Swift Charts only); project generated with XcodeGen, .xcodeproj committed.
 - All test material is synthesised (tones, drum loop, chirps, a procedural test
   card) to avoid licensing; users can load their own photo in Settings.
-- Picture demos are grayscale; colour, chroma subsampling and gamma are covered
-  in text only.
+- Picture demos in Lessons 10–11 are grayscale. Colour and gamma got their own
+  Lesson 13 (asked: new lesson; gamma + chroma subsampling). Decided without
+  asking: BT.601 Y′CbCr weights (as JPEG), chroma averaged per block and
+  replicated back, 4 transfer presets, and a colour test card built to expose
+  subsampling; white balance, gamuts and HDR curves stay in the text.
 - Progress = passing a lesson's quiz (default 2 of 3, adjustable to 3 of 3).
 - Settings: text size, explanations, pass mark, volume, tone length, demo image,
   reset progress.
@@ -100,3 +103,4 @@ CHANGELOG:
 - 2026-10-05 — added meta-instruction: applications include a settings button or tab
 - 2026-10-06 — built v1.0 of the Mac app: 12 lessons, 12 demos, quizzes, progress, settings, feedback, tests, docs
 - 2026-10-06 — built the website (private Artifact) and moved lesson content into a shared course.json
+- 2026-10-06 — added Lesson 13 "Colour, Gamma and Chroma" with a gamma + chroma subsampling demo (Mac app and website)

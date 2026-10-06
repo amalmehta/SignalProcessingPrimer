@@ -99,12 +99,36 @@ test('wagon wheel: 3 rev/s, 8 spokes, 24 fps looks frozen; 2 rev/s looks backwar
 test('shared course.json is well formed', () => {
   const course = JSON.parse(readFileSync(new URL('../../content/course.json', import.meta.url)));
   const lessons = course.modules.flatMap(m => m.lessons);
-  assert.equal(course.modules.length, 4); assert.equal(lessons.length, 12);
-  assert.equal(new Set(lessons.map(l => l.demo)).size, 12, 'every demo used once');
-  assert.equal(new Set(lessons.map(l => l.id)).size, 12, 'unique lesson ids');
+  assert.equal(course.modules.length, 4); assert.equal(lessons.length, 13);
+  assert.equal(new Set(lessons.map(l => l.demo)).size, 13, 'every demo used once');
+  assert.equal(new Set(lessons.map(l => l.id)).size, 13, 'unique lesson ids');
   for (const l of lessons) {
     assert.equal(l.blocks.filter(b => b.type === 'demo').length, 1, l.id);
     assert.ok(l.blocks.some(b => b.type === 'inPractice'), `${l.id} needs an In practice box`);
     for (const q of l.quiz) assert.ok(q.answer >= 0 && q.answer < q.choices.length, l.id);
   }
+});
+
+test('transfer functions invert; sRGB(0.1) ≈ 0.349', () => {
+  for (const t of ['Linear', ...D.TRANSFERS]) for (let l = 0; l <= 1; l += 0.05) near(D.decodeTransfer(t, D.encodeTransfer(t, l)), l, 1e-9, t);
+  near(D.encodeTransfer('sRGB', 0.1), 0.349, 0.001);
+});
+
+test('gamma gives shadows more codes (lesson numbers: 26 vs 90 at 8 bits)', () => {
+  assert.equal(D.codesBelow(0.1, 8, 'Linear'), 26);
+  assert.equal(D.codesBelow(0.1, 8, 'sRGB'), 90);
+  const dark = t => new Set(D.storedRamp(1000, 5, t).filter(v => v < 0.1)).size;
+  assert.ok(dark('sRGB') > 2 * dark('Linear'));
+});
+
+test('Y′CbCr round trip; 4:2:0 keeps luma and loses chroma detail', () => {
+  const [y, cb, cr] = D.toYCbCr(1, 1, 1); near(y, 1, 1e-9); near(cb, 0, 1e-9); near(cr, 0, 1e-9);
+  const back = D.toRGB(...D.toYCbCr(0.8, 0.3, 0.1)); [0.8, 0.3, 0.1].forEach((v, i) => near(back[i], v, 1e-4));
+  const w = 16, n = w * w;   // 1-px red/green stripes: pure chroma detail
+  const img = { width: w, height: w, r: Float32Array.from({ length: n }, (_, i) => (i % 2 ? 0.15 : 0.8)), g: Float32Array.from({ length: n }, (_, i) => (i % 2 ? 0.55 : 0.2)), b: new Float32Array(n).fill(0.2) };
+  const full = D.subsample(img, '4:4:4'), quarter = D.subsample(img, '4:2:0');
+  assert.ok(D.psnrRGB(img, full.image) > 60);
+  assert.ok(D.psnrRGB(img, quarter.image) < 30);
+  assert.deepEqual(Array.from(full.y), Array.from(quarter.y));
+  assert.equal(D.samplesPerPixel('4:2:0'), 1.5); assert.equal(D.samplesPerPixel('4:2:2'), 2);
 });

@@ -124,3 +124,40 @@ final class DSPTests: XCTestCase {
         XCTAssertGreaterThan(lastPeak, firstPeak * 5)
     }
 }
+
+final class ColourTests: XCTestCase {
+    func testTransferFunctionsInvert() {
+        for t in ColourDSP.Transfer.allCases {
+            for l in stride(from: 0.0, through: 1, by: 0.05) {
+                XCTAssertEqual(t.decode(t.encode(l)), l, accuracy: 1e-9, "\(t.rawValue) at \(l)")
+            }
+        }
+        XCTAssertEqual(ColourDSP.Transfer.sRGB.encode(0.1), 0.349, accuracy: 0.001)
+    }
+
+    func testGammaGivesShadowsMoreCodes() {
+        // The lesson's numbers: 8-bit linear ≈ 26 codes for the darkest 10%; sRGB ≈ 90.
+        XCTAssertEqual(ColourDSP.codesBelow(0.1, bits: 8, transfer: .linear), 26)
+        XCTAssertEqual(ColourDSP.codesBelow(0.1, bits: 8, transfer: .sRGB), 90)
+        let linear = Set(ColourDSP.storedRamp(count: 1000, bits: 5, transfer: .linear).filter { $0 < 0.1 })
+        let srgb = Set(ColourDSP.storedRamp(count: 1000, bits: 5, transfer: .sRGB).filter { $0 < 0.1 })
+        XCTAssertGreaterThan(srgb.count, linear.count * 2)
+    }
+
+    func testYCbCrRoundTripAndLumaWeights() {
+        let (y, cb, cr) = ColourDSP.toYCbCr(r: 1, g: 1, b: 1)
+        XCTAssertEqual(y, 1, accuracy: 1e-6); XCTAssertEqual(cb, 0, accuracy: 1e-6); XCTAssertEqual(cr, 0, accuracy: 1e-6)
+        let c = ColourDSP.toYCbCr(r: 0.8, g: 0.3, b: 0.1), back = ColourDSP.toRGB(y: c.y, cb: c.cb, cr: c.cr)
+        XCTAssertEqual(back.r, 0.8, accuracy: 1e-4); XCTAssertEqual(back.g, 0.3, accuracy: 1e-4); XCTAssertEqual(back.b, 0.1, accuracy: 1e-4)
+    }
+
+    func testSubsamplingKeepsLumaAndLosesChromaDetail() {
+        let card = ColourDSP.colourCard(size: 64)
+        let full = ColourDSP.subsample(card, .s444), quarter = ColourDSP.subsample(card, .s420)
+        XCTAssertGreaterThan(ColourDSP.psnr(card, full.image), 40, "4:4:4 is (nearly) lossless")
+        XCTAssertLessThan(ColourDSP.psnr(card, quarter.image), ColourDSP.psnr(card, full.image))
+        XCTAssertEqual(full.y, quarter.y, "luma is never subsampled")
+        XCTAssertEqual(ColourDSP.Subsampling.s420.samplesPerPixel, 1.5)
+        XCTAssertEqual(ColourDSP.Subsampling.s422.samplesPerPixel, 2)
+    }
+}
