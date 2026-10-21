@@ -2,7 +2,7 @@
 
 A course on signal processing for audio, images, video and film, as a Mac app and a website. It has 13 lessons, and each one has a demo you can play with and listen to, plus a short quiz.
 
-**Website:** [claude.ai/artifact/4mZjs9pvjHnj2D5RcxiPtu](https://claude.ai/artifact/4mZjs9pvjHnj2D5RcxiPtu) (private until you share it)
+**Website:** [amalmehta.github.io/SignalProcessingPrimer](https://amalmehta.github.io/SignalProcessingPrimer/)
 
 ![Sampling and Aliasing lesson in the Mac app](docs/images/lesson-sampling.jpg)
 
@@ -23,4 +23,4 @@ flowchart LR
     C --> D["Images, video and film<br/>2-D filters · DCT/JPEG · frame rate and shutter · colour, gamma, white balance and gamuts"]
 ```
 
-**Links:** [Website](https://claude.ai/artifact/4mZjs9pvjHnj2D5RcxiPtu) · [Setup and use](docs/INSTRUCTIONS.md) · [System design](docs/SYSTEM-DESIGN.md) · [File structure](docs/FILE-STRUCTURE.md) · [Original brief](signal_processing_primer.md)
+**Links:** [Website](https://amalmehta.github.io/SignalProcessingPrimer/) · [Setup and use](docs/INSTRUCTIONS.md) · [System design](docs/SYSTEM-DESIGN.md) · [File structure](docs/FILE-STRUCTURE.md) · [Original brief](signal_processing_primer.md)

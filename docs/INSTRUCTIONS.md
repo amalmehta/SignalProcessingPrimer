@@ -51,7 +51,7 @@ There are 34 tests. 16 check the DSP maths (FFT, aliasing, quantisation SNR, con
 
 ## The website
 
-The website is published as a private Artifact: <https://claude.ai/artifact/4mZjs9pvjHnj2D5RcxiPtu>. Only you can open it until you share it from the page's Share menu.
+The website is published on GitHub Pages at <https://amalmehta.github.io/SignalProcessingPrimer/>, rebuilt from `web/` on every push to `main`.
 
 It has the same 13 lessons, demos, quizzes, settings and feedback as the Mac app.
 - **Settings:** the gear button, or ⌘, while the page has focus.
